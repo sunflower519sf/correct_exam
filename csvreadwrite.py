@@ -6,7 +6,8 @@ delimiter = config["read_write_csv"]["data_delimiter"]
 
 
 def safe_filename(name:str):
-    return f"{name.replace("\\", "/").strip(".").strip("/")}.csv"
+    out = ".".join(name.replace("\\", "/").strip("/").split(".")[:-1])
+    return f'{out}.csv'
 
 
 def read_csv(filename):

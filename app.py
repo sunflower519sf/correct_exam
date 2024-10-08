@@ -32,22 +32,25 @@ def safe_string(string:str):
 
 # 取得答案檔
 def get_ans_file(all_img_file:list, config):
-    # 取得路徑
-    file_path = safe_filename(config["img"]["folder_path"])
+    global ans_file_name
     # 取得檔案名稱
     file_name = safe_filename(config["img"]["ans_file_name"])
     
     
     if file_name.split(".")[-1].lower() in safe_text(config["img"]["format"]):
         if file_name in all_img_file:
-            return [f"{file_name}/ansfile?.ansfile?"] + all_img_file.remove(file_name)
+            ans_file_name = file_name
+            all_img_file.remove(file_name)
+            return [f"{file_name}/ansfile?.ansfile?"] + all_img_file
         else:
             return ["nofile?.ansfile?"] + all_img_file
     else:
         for file_extension in safe_text(config["img"]["format"]):
             file_name = f"{file_name}.{file_extension}" 
             if file_name in all_img_file:
-                return [f"{file_name}/ansfile?.ansfile?"] + all_img_file.remove(file_name)
+                ans_file_name = file_name
+                all_img_file.remove(file_name)
+                return [f"{file_name}/ansfile?.ansfile?"] + all_img_file
         else:
             return ["nofile?.ansfile?"] + all_img_file
         
@@ -312,9 +315,10 @@ for filename in get_ans_file(os.listdir(folder_path), config):
             save_ans_temp.append(save_ans)
         save_ans_all.append(save_ans_temp)
 
+
+    eaxm_ans_dict[filename] = save_ans_all.copy()
     if check_is_ans_file:
-        eaxm_ans_dict[filename] = save_ans_all.copy()
-        write_csv(config["read_write_csv"]["data_delimiter"], filename, [save_ans_all.copy(), 100])
+        write_csv(config["read_write_csv"]["csv_file_name"], filename, [save_ans_all.copy(), 100])
         have_ans = True
         print("提示: 答案已取得 存入檔案")
         continue
@@ -324,9 +328,8 @@ for filename in get_ans_file(os.listdir(folder_path), config):
         score = 0
         if not have_ans:
             print("提示: 沒有答案, 無法取得分數")
-        
         else:
-            answer_data = eaxm_ans_dict[safe_filename(config["img"]["ans_file_name"])]
+            answer_data = eaxm_ans_dict[ans_file_name]
             for line in range(len(answer_data)):
                 for value in range(len(answer_data[line])):
                     if len(eaxm_ans_dict[filename]) > line and len(eaxm_ans_dict[filename][line]) > value:
@@ -339,4 +342,4 @@ for filename in get_ans_file(os.listdir(folder_path), config):
                     else:
                         print(f"Error: 答案超出範圍 請確認 {config['read_write_csv']['csv_file_name']} 中的答案是否有多餘的資料")
             print(f"分數: {score}")
-        write_csv(config["read_write_csv"]["data_delimiter"], filename, [save_ans_all.copy(), score])
+        write_csv(config["read_write_csv"]["csv_file_name"], filename, [save_ans_all.copy(), score])
