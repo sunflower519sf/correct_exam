@@ -8,7 +8,7 @@ ocr.set_ranges("ABCDabcdEe")
 
 
 # 讀取圖片
-image_path = './aimg.png'  # 確保這裡的路徑正確
+image_path = './img/aimg.png'  # 確保這裡的路徑正確
 image = cv2.imread(image_path)
 
 # 轉換成灰階

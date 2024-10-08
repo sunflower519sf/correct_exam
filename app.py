@@ -2,8 +2,9 @@ import ddddocr
 import os
 import cv2
 import numpy as np
-
-
+import json
+import re
+from csvreadwrite import read_csv, write_csv
 
 # 計算兩點距離
 def calculate_the_distance_between_2_points(points1, points2):
@@ -13,9 +14,49 @@ def calculate_the_distance_between_2_points(points1, points2):
 def preprocess_image(image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) # 灰階
     thresh = cv2.adaptiveThreshold(gray, 255, 
-                               cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-                               cv2.THRESH_BINARY_INV, 11, 2) # 二值化並反轉
+                                cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+                                cv2.THRESH_BINARY_INV, 11, 2) # 二值化並反轉
     return thresh
+
+# 檔案或路徑名稱防呆
+def safe_filename(name:str):
+    return name.replace("\\", "/").strip(".").strip("/")
+
+# 陣列文字大小寫統一
+def safe_text(lst:list):
+    return [char.lower() for char in lst]
+
+# 字串處理
+def safe_string(string:str):
+    return re.sub(r"[^a-zA-Z0-9]+", "", string).lower()
+
+# 取得答案檔
+def get_ans_file(all_img_file:list, config):
+    # 取得路徑
+    file_path = safe_filename(config["img"]["folder_path"])
+    # 取得檔案名稱
+    file_name = safe_filename(config["img"]["ans_file_name"])
+    
+    
+    if file_name.split(".")[-1].lower() in safe_text(config["img"]["format"]):
+        if file_name in all_img_file:
+            return [f"{file_name}/ansfile?.ansfile?"] + all_img_file.remove(file_name)
+        else:
+            return ["nofile?.ansfile?"] + all_img_file
+    else:
+        for file_extension in safe_text(config["img"]["format"]):
+            file_name = f"{file_name}.{file_extension}" 
+            if file_name in all_img_file:
+                return [f"{file_name}/ansfile?.ansfile?"] + all_img_file.remove(file_name)
+        else:
+            return ["nofile?.ansfile?"] + all_img_file
+        
+    
+    
+
+# 載入配置文件
+with open("config.json", "r", encoding="utf-8") as f:
+    config = json.load(f)
 
 
 # 載入檢測模型
@@ -24,23 +65,44 @@ ocr_issu = ddddocr.DdddOcr()
 # 指定範圍 減少錯誤
 ocr_beta.set_ranges("ABCDabcdEe")
 ocr_issu.set_ranges("ABCDabcdEe")
-# 要求使用 probability=True (其他人提出的問題得知)
-# result = ocr.classification(image, probability=True)
-# s = ""
-# for i in result['probability']:
-#     s += result['charsets'][i.index(max(i))]
 
 
+# 用於臨時存放答案
+eaxm_ans_dict = {}
+
+# 確保有此資料夾
+folder_path = safe_filename(config["img"]["folder_path"])
+if not os.path.exists(folder_path):
+    os.makedirs(folder_path)
+    print(f"ERROR: 查無此資料夾 以自動建立資料夾 {config['img']['folder_path']}")
+# 確保有答案
+have_ans = False
 # 使用for提取資料夾中所有圖片
-for filename in os.listdir("./img"):
+for filename in get_ans_file(os.listdir(folder_path), config):
+    filename = safe_filename(filename)
     print(filename)
-    accept_img_fromat = ["png", "jpg", "jpeg", "webp"]
-    if not filename.split(".")[-1].lower() in accept_img_fromat:
-        print(f"ERROR: {filename} 不是符合要求的圖片格式 以下是可接受的格式:\n{', '.join(accept_img_fromat)}")
+    # 檢測是否符合格式 增加一個條件用於檢測答案檔
+    check_is_ans_file = False
+    
+    check_file_name = filename.split(".")[-1].lower() 
+    if check_file_name == "ansfile?":
+        ans_file_split = filename.split("/")
+        if ans_file_split[-1] == "ansfile?.ansfile?":
+            filename = ans_file_split[0]
+            check_is_ans_file = True
+        elif ans_file_split[-1] == "nofile?.ansfile?":
+            print(f"ERROR: 找不到指定的答案檔案")
+            continue
+    elif not check_file_name in safe_text(config["img"]["format"]):
+        print(f"ERROR: {filename} 不是符合要求的圖片格式 以下是可接受的格式:\n{', '.join(config['img']['format'])}")
         continue
+    
+    
+
 
     # 讀取影像
-    image = cv2.imread(filename)
+    image = cv2.imread(f"{safe_filename(config['img']['folder_path'])}/{filename}")
+    
     if image is None:
         print(f"ERROR: 讀取 {filename} 失敗")
         continue
@@ -48,8 +110,8 @@ for filename in os.listdir("./img"):
     # 影像預處理
     thresh = preprocess_image(image)
     
-    # 膨脹 # iterations=1 可以改成自定義
-    dilated_image = cv2.dilate(thresh, None, iterations=1)
+    # 膨脹 
+    dilated_image = cv2.dilate(thresh, None, iterations=config["find_table"]["line_expansion_degree"])
 
     # 找出輪廓
     contours, hierarchy = cv2.findContours(dilated_image, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
@@ -171,7 +233,7 @@ for filename in os.listdir("./img"):
     # 計算填充的大小
     padding = int(image_height * 0.1)
     # 填充圖像
-    perspective_corrected_image_with_padding = cv2.copyMakeBorder(perspective_corrected_image, padding, cv2.BORDER_CONSTANT, value=[255, 255, 255])
+    perspective_corrected_image_with_padding = cv2.copyMakeBorder(perspective_corrected_image, padding, padding, padding, padding, cv2.BORDER_CONSTANT, value=[255, 255, 255])
 
     # 影像預處理
     thresh = preprocess_image(perspective_corrected_image_with_padding)
@@ -201,12 +263,14 @@ for filename in os.listdir("./img"):
 
     # 定義檢測用的資料
     # 設定水平、垂直線的間隔
-    horizontal_line_spacing = perspective_corrected_image_with_padding.shape[0] / len(horizontal_lines)
-    vertical_line_spacing = perspective_corrected_image_with_padding.shape[1] / len(vertical_lines)
+    horizontal_line_spacing = perspective_corrected_image.shape[0] / len(horizontal_lines)
+    vertical_line_spacing = perspective_corrected_image.shape[1] / len(vertical_lines)
     
     # 根據行列數量切割圖像
     all_img_save = []
     for i in range(len(horizontal_lines)-1):
+        temp_img_save = []
+        have_data = False
         for j in range(len(vertical_lines)-1):
             # 確定格子的邊界
             y_start = horizontal_lines[i]
@@ -219,18 +283,60 @@ for filename in os.listdir("./img"):
             
             # 儲存符合大小的影像
             if abs(y_end-y_start) > horizontal_line_spacing and abs(x_end-x_start) > vertical_line_spacing:
-                all_img_save.append(roi)
+                temp_img_save.append(roi)
+                have_data = True
+        if have_data:
+            all_img_save.append(temp_img_save)
 
-    for img in all_img_save:
+    # 逐一檢測每個格子的文字
+    save_ans_all = []
+    for line_img in all_img_save:
+        save_ans_temp = []
+        for img in line_img:
+            # 影像預處理
+            img_orc = preprocess_image(img)
+            
+            # 這裡可以用其他模型檢查答案
+            # 將二值化圖像轉換為字節數組
+            is_success, gray_bytes = cv2.imencode('.png', img_orc)
+            if not is_success:
+                raise ValueError("圖片無法編碼為 bytes 資料")
+            
+            # 使用不同模型檢查答案
+            result_beta = ocr_beta.classification(gray_bytes.tobytes())
+            result_issu = ocr_issu.classification(gray_bytes.tobytes())
 
-        # 影像預處理
-        img_orc = preprocess_image(img)
+            print(f"Beta: {result_beta}\nIssu: {result_issu}")
+            # 儲存答案
+            save_ans = [f"{safe_string(result_beta)}", f"{safe_string(result_issu)}"]
+            save_ans_temp.append(save_ans)
+        save_ans_all.append(save_ans_temp)
 
-        # 將二值化圖像轉換為字節數組
-        is_success, gray_bytes = cv2.imencode('.png', img_orc)
-        if not is_success:
-            raise ValueError("圖片無法編碼為 bytes 資料")
+    if check_is_ans_file:
+        eaxm_ans_dict[filename] = save_ans_all.copy()
+        write_csv(config["read_write_csv"]["data_delimiter"], filename, [save_ans_all.copy(), 100])
+        have_ans = True
+        print("提示: 答案已取得 存入檔案")
+        continue
+   
+    else:
+        # 計算分數
+        score = 0
+        if not have_ans:
+            print("提示: 沒有答案, 無法取得分數")
         
-        result_beta = ocr_beta.classification(gray_bytes.tobytes())
-        result_issu = ocr_issu.classification(gray_bytes.tobytes())
-    
+        else:
+            answer_data = eaxm_ans_dict[safe_filename(config["img"]["ans_file_name"])]
+            for line in range(len(answer_data)):
+                for value in range(len(answer_data[line])):
+                    if len(eaxm_ans_dict[filename]) > line and len(eaxm_ans_dict[filename][line]) > value:
+                        for data in range(len(answer_data[line][value])):
+                            if len(eaxm_ans_dict[filename][line][value]) > data:
+                                if answer_data[line][value][data] == eaxm_ans_dict[filename][line][value][data]:
+                                    score += config["score_setting"]["score_per_question"]
+                            else:
+                                print(f"Error: 答案超出範圍 請確認 {config['read_write_csv']['csv_file_name']} 中的答案是否有多餘的資料")
+                    else:
+                        print(f"Error: 答案超出範圍 請確認 {config['read_write_csv']['csv_file_name']} 中的答案是否有多餘的資料")
+            print(f"分數: {score}")
+        write_csv(config["read_write_csv"]["data_delimiter"], filename, [save_ans_all.copy(), score])

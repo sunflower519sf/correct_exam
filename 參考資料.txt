@@ -13,3 +13,15 @@ https://livefiredev.com/how-to-extract-table-from-image-in-python-opencv-ocr/
 使用canny檢測線條並提取出每一格
 https://docs.opencv.org/4.x/da/d5c/tutorial_canny_detector.html
 
+字形來源(瀨戶字體)
+https://zh-tw.osdn.net/projects/setofont/downloads/61995/setofont_v_6_20.zip/
+
+圖像上書寫文字
+https://shengyu7697.github.io/python-pil-draw-text-on-image/
+https://pillow.readthedocs.io/en/stable/reference/ImageDraw.html
+https://sean22492249.medium.com/%E7%94%A8-python-%E5%9C%A8%E5%9C%96%E5%83%8F%E4%B8%8A%E5%AF%AB%E5%AD%97-d62a431ea727
+
+文字傾斜
+https://stackoverflow.com/questions/7501009/affine-transform-in-pil-python
+
+文字底線
