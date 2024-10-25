@@ -1,0 +1,32 @@
+img: 
+  folder_path: ./img  # 設定圖片資料夾路徑 預設為./img 請注意路徑每個資料夾使用 / 分隔
+  format:  # 設定可接受圖片格式 預設為png, jpg, jpeg, webp
+  - png
+  - jpg
+  - jpeg
+  - webp
+  ans_file_name: ans  # 設定答案檔案名稱 預設為ans 可以不用加入副檔名 但要注意是否有同名檔案 如果有疑慮 可以加上副檔名防止錯誤
+  template_file: src/img/template.png  # 設定模板圖片路徑 預設為src/img/template.png
+
+score_setting: 
+  total_score: 100  # 設定總分 預設為100
+  score_per_question: 10  # 設定每題分數 預設為10
+  
+find_table: 
+  line_expansion_degree: 1  # 設定尋找表格時線條擴張程度 預設為1 不建議超過10 通常用於線條太細時增加辨識出表格成功率 但過高可能導致字與表格混淆 導致出錯
+  auto_perspective: !!bool false # 設定是否在裁減圖片時自動進行透視變換 用作於圖片有傾斜時使用 預設為false 
+  crop_ratio_mult: 100 # 設定裁切時圖片大小的倍數 如果設定過大會造成使用過多資源 但成功率更高 過低容易出錯或是檢測不到內容 預設為100
+  position_image_domain_value: 0.7 # 設定定位圖片時可接受的域值 過大可能導致定位失敗 過小可以定位錯誤 預設為0.7
+  number_of_answers: 4  # 設定每題答案數量 正常為A, B, C, D 共4個 預設為4
+  number_of_rows: 10  # 設定每一排(從上往下)的數量 預設為10
+  
+read_write_csv:
+  csv_file_name: ans.csv  # 設定存放csv檔案名稱 預設為ans.csv
+  data_delimiter: !!str "|"  # 設定csv資料分隔符號 預設為|
+
+
+print-text:
+  font_size: 100  # 設定印出文字時字體大小 預設為100
+  font_path: ./setofont.ttf  # 設定印出文字時字體路徑 預設為./setofont.ttf
+  shear_factor: 0.5  # 設定印出文字時斜度 預設為0.5
+  Increase_interval: 0  # 增加畫出文字距離邊界的距離 預設為0 建議不要設定太大 會導致文字超出圖片

@@ -40,7 +40,7 @@ ocr_issu.set_ranges("ABCDabcdEe")
 
 
 # 讀取影像
-image = cv2.imread("aimg2.png")
+image = cv2.imread("gg.png")
 
 
 # 影像預處理
