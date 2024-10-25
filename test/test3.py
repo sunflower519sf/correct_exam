@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 
 # 读取图像
-image_path = './test7.png'  # 替换为你的图片路径
+image_path = './gg.png'  # 替换为你的图片路径
 image = cv2.imread(image_path)
 
 # 检查图像是否成功读取
@@ -43,6 +43,9 @@ if table_contour is not None:
     
     # 显示表格ROI
     cv2.imshow('Detected Table', table_roi)
+    
+    cv2.imwrite("image_with_only_rectangular_contours.png", table_roi)
+    
     cv2.waitKey(0)
     cv2.destroyAllWindows()
 else:

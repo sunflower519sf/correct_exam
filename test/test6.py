@@ -18,7 +18,7 @@ def preprocess_image(image):
 
 
 # 讀取影像
-image = cv2.imread("S__20750478.jpg")
+image = cv2.imread("test.png")
 
 
 # 影像預處理
