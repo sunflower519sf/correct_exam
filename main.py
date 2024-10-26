@@ -5,6 +5,8 @@ import re
 from csvreadwrite import read_csv, write_csv
 import yaml
 from imutils.object_detection import non_max_suppression
+import time
+
 
 # 計算兩點距離
 def calculate_the_distance_between_2_points(points1, points2):
@@ -190,18 +192,35 @@ for filename in get_ans_file(os.listdir(folder_path), CONFIG):
     position_points = [calculate_the_center_point_of_2_points(rect) for rect in template_pick]
     
     # 每個格子高度55 寬度46(設定乘數分別乘上 0.55:0.46)
+    all_ans_out = []
     clone = use_image.copy()
-    for position in position_points:
+    for position in sorted(position_points):
         # 計算格子座標
+        ans_number_selected = []
         for number in range(CONFIG["find_table"]["number_of_rows"]):
             pos_y = position[1] + (number+1) * (0.55*CONFIG["find_table"]["crop_ratio_mult"])
+            ans_selected_option = []
             for option in range(CONFIG["find_table"]["number_of_answers"]):
-                pos_x = position[0] + (option+1) * (0.46*CONFIG["find_table"]["crop_ratio_mult"])
+                pos_x = position[0] + (option+1) * (0.467*CONFIG["find_table"]["crop_ratio_mult"])
                 
-                # 將每個點畫出來
+                # # 將每個點畫出來
+                # clone = cv2.rectangle(clone, (int(pos_x)-17, int(pos_y)-22), (int(pos_x)+17, int(pos_y)+22), (0, 0, 255), 2)
+
+                # 取得答案
+                get_ans_img = use_image_preprocess[int(pos_y)-22:int(pos_y)+22, int(pos_x)-17:int(pos_x)+17]
+                # 將圖片中內容放大
+                ans_img_dilated = cv2.dilate(get_ans_img, None, iterations=CONFIG["find_table"]["option_detect_expansion_degree"])
                 
-                clone = cv2.rectangle(clone, (int(pos_x)-5, int(pos_y)-5), (int(pos_x)+5, int(pos_y)+5), (0, 0, 255), 2)
-                cv2.imwrite("output.png", clone)
-        
-
-
+                # 計算像素點數量
+                total_pixels = ans_img_dilated.size
+                # 計算白色像素點數量
+                white_pixels = np.sum(ans_img_dilated > 200)
+                # 計算比率
+                white_pixel_ratio = white_pixels/total_pixels*100
+                if white_pixel_ratio > CONFIG["find_table"]["option_detect_domain_value"]:
+                    ans_selected_option.append(True)
+                else:
+                    ans_selected_option.append(False)
+            ans_number_selected.append(ans_selected_option)
+        all_ans_out.append(ans_number_selected)
+    print(all_ans_out)

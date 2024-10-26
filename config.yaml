@@ -19,7 +19,10 @@ find_table:
   position_image_domain_value: 0.7 # 設定定位圖片時可接受的域值 過大可能導致定位失敗 過小可以定位錯誤 預設為0.7
   number_of_answers: 4  # 設定每題答案數量 正常為A, B, C, D 共4個 預設為4
   number_of_rows: 10  # 設定每一排(從上往下)的數量 預設為10
+  option_detect_expansion_degree: 10  # 設定檢測選項時的放大程度 用於在學生作答選擇該選項時將所選擇內容擴大增加檢測成功率 預設為10
+  option_detect_domain_value: 50  # 設定檢測選項時的域值百分比 如過低可能錯誤的點也會被檢測 過高可能導致有劃記的選項被掠過 預設為50
   
+
 read_write_csv:
   csv_file_name: ans.csv  # 設定存放csv檔案名稱 預設為ans.csv
   data_delimiter: !!str "|"  # 設定csv資料分隔符號 預設為|
