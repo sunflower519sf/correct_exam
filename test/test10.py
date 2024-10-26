@@ -1,5 +1,7 @@
 import cv2
 
+
+
 img = cv2.imread("test.png")
 
 # # 修改大小
@@ -10,4 +12,5 @@ img = cv2.imread("test.png")
 
 x, y, w, h = 7,688,40,50
 test = img[y:y+h, x:x+w]
-cv2.imwrite("search.png", test)
+cv2.imwrite("aaa.png", test)
+
