@@ -6,7 +6,9 @@ img:
   - jpeg
   - webp
   ans_file_name: ans  # 設定答案檔案名稱 預設為ans 可以不用加入副檔名 但要注意是否有同名檔案 如果有疑慮 可以加上副檔名防止錯誤
-  template_file: src/img/template.png  # 設定模板圖片路徑 預設為src/img/template.png
+  contrast_folder: src/img  # 設定模板資料夾路徑 預設為 src/img
+  ans_template_file: ans_template.png  # 設定模板圖片路徑 預設為 template.png
+  minus_blank: minus_blank.png  # 設定空白答案卡路徑 預設為 minus_blank.png
 
 score_setting: 
   total_score: 100  # 設定總分 預設為100
@@ -19,7 +21,7 @@ find_table:
   position_image_domain_value: 0.7 # 設定定位圖片時可接受的域值 過大可能導致定位失敗 過小可以定位錯誤 預設為0.7
   number_of_answers: 4  # 設定每題答案數量 正常為A, B, C, D 共4個 預設為4
   number_of_rows: 10  # 設定每一排(從上往下)的數量 預設為10
-  option_detect_expansion_degree: 10  # 設定檢測選項時的放大程度 用於在學生作答選擇該選項時將所選擇內容擴大增加檢測成功率 預設為10
+  option_detect_expansion_degree: 15  # 設定檢測選項時的放大程度 用於在學生作答選擇該選項時將所選擇內容擴大增加檢測成功率 預設為15
   option_detect_domain_value: 50  # 設定檢測選項時的域值百分比 如過低可能錯誤的點也會被檢測 過高可能導致有劃記的選項被掠過 預設為50
   
 

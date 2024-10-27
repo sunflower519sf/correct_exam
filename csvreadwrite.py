@@ -1,4 +1,5 @@
 import json
+import ast
 
 with open("config.json", "r", encoding="utf-8") as config_data:
     config = json.load(config_data)
@@ -6,7 +7,7 @@ delimiter = config["read_write_csv"]["data_delimiter"]
 
 
 def safe_filename(name:str):
-    out = ".".join(name.replace("\\", "/").strip("/").split(".")[:-1])
+    out = name.replace("\\", "/").strip("/").replace(".csv", "")
     return f'{out}.csv'
 
 
@@ -17,7 +18,8 @@ def read_csv(filename):
         linedata = csvfile.readlines()
         for i in linedata:
             data = i.strip().split(delimiter)
-            lst[data[0]] = eval(data[1])
+            # lst[data[0]] = eval(data[1]) 
+            lst[data[0]] = ast.literal_eval(data[1])
     return lst
 
 def write_dict_csv(filename, lst):

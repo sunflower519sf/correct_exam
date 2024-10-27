@@ -67,7 +67,9 @@ with open("config.yaml", "r", encoding="utf-8") as fr:
     CONFIG = yaml.safe_load(fr)
 
 # 載入定位圖片
-template = cv2.imread(safe_filename(CONFIG["img"]["template_file"]))
+template = cv2.imread(safe_filename(f'{CONFIG["img"]["contrast_folder"]}/{CONFIG["img"]["ans_template_file"]}'))
+# 載入空白答案卡
+minus_blank = cv2.imread(safe_filename(f'{CONFIG["img"]["contrast_folder"]}/{CONFIG["img"]["minus_blank"]}'))
 
 # 確保有此資料夾
 folder_path = safe_filename(CONFIG["img"]["folder_path"])
@@ -171,12 +173,16 @@ for filename in get_ans_file(os.listdir(folder_path), CONFIG):
     # 將圖片調整為指定大小
     use_image = cv2.resize(use_image, (CONFIG["find_table"]["crop_ratio_mult"]*12, CONFIG["find_table"]["crop_ratio_mult"]*13)) # 大概是12:13的比例
 
+    # 儲存空白用
+    # cv2.imwrite("minus_blank.png", use_image)
 
     # 尋找出定位點
     # 預處理圖片
     use_image_preprocess = preprocess_image(use_image)
+    minus_blank_preprocess = preprocess_image(minus_blank)
     template_preprocess = preprocess_image(template)
-
+    use_image_blank = cv2.subtract(use_image_preprocess, minus_blank_preprocess)
+    
     # 計算匹配值 
     result = cv2.matchTemplate(use_image_preprocess, template_preprocess,
 	cv2.TM_CCOEFF_NORMED)
@@ -198,16 +204,16 @@ for filename in get_ans_file(os.listdir(folder_path), CONFIG):
         # 計算格子座標
         ans_number_selected = []
         for number in range(CONFIG["find_table"]["number_of_rows"]):
-            pos_y = position[1] + (number+1) * (0.55*CONFIG["find_table"]["crop_ratio_mult"])
+            pos_y = position[1] + (number+1) * (0.54*CONFIG["find_table"]["crop_ratio_mult"]) + (number+1) * (0.008*CONFIG["find_table"]["crop_ratio_mult"])
             ans_selected_option = []
             for option in range(CONFIG["find_table"]["number_of_answers"]):
-                pos_x = position[0] + (option+1) * (0.467*CONFIG["find_table"]["crop_ratio_mult"])
+                pos_x = position[0] + (option+1) * (0.43*CONFIG["find_table"]["crop_ratio_mult"]) + (option) * (0.045*CONFIG["find_table"]["crop_ratio_mult"])
                 
-                # # 將每個點畫出來
-                # clone = cv2.rectangle(clone, (int(pos_x)-17, int(pos_y)-22), (int(pos_x)+17, int(pos_y)+22), (0, 0, 255), 2)
+                # 將每個點畫出來
+                clone = cv2.rectangle(clone, (int(pos_x)-18, int(pos_y)-22), (int(pos_x)+18, int(pos_y)+22), (0, 0, 255), 2)
 
                 # 取得答案
-                get_ans_img = use_image_preprocess[int(pos_y)-22:int(pos_y)+22, int(pos_x)-17:int(pos_x)+17]
+                get_ans_img = use_image_blank[int(pos_y)-22:int(pos_y)+22, int(pos_x)-18:int(pos_x)+18]
                 # 將圖片中內容放大
                 ans_img_dilated = cv2.dilate(get_ans_img, None, iterations=CONFIG["find_table"]["option_detect_expansion_degree"])
                 
@@ -223,4 +229,9 @@ for filename in get_ans_file(os.listdir(folder_path), CONFIG):
                     ans_selected_option.append(False)
             ans_number_selected.append(ans_selected_option)
         all_ans_out.append(ans_number_selected)
-    print(all_ans_out)
+        
+    cv2.imwrite("output.png", clone)
+    
+
+    write_csv(safe_filename(CONFIG['img']['ans_file_name']), filename, all_ans_out)
+    
