@@ -23,7 +23,7 @@ find_table:
   number_of_answers: 4  # 設定每題答案數量 正常為A, B, C, D 共4個 預設為4
   number_of_rows: 10  # 設定每一排(從上往下)的數量 預設為10
   option_detect_expansion_degree: 20  # 設定檢測選項時的放大程度 用於在學生作答選擇該選項時將所選擇內容擴大增加檢測成功率 預設為20
-  option_detect_domain_value: 50  # 設定檢測選項時的域值百分比 如過低可能錯誤的點也會被檢測 過高可能導致有劃記的選項被掠過 預設為50
+  option_detect_domain_value: 40  # 設定檢測選項時的域值百分比 如過低可能錯誤的點也會被檢測 過高可能導致有劃記的選項被掠過 預設為40
   
 
 read_write_csv:
