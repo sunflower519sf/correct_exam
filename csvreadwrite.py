@@ -1,9 +1,10 @@
-import json
+import yaml
 import ast
 
-with open("config.json", "r", encoding="utf-8") as config_data:
-    config = json.load(config_data)
-delimiter = config["read_write_csv"]["data_delimiter"]
+# 載入配置文件
+with open("config.yaml", "r", encoding="utf-8") as fr:
+    CONFIG = yaml.safe_load(fr)
+delimiter = CONFIG["read_write_csv"]["data_delimiter"]
 
 
 def safe_filename(name:str):
