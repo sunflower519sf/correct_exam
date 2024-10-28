@@ -30,9 +30,3 @@ read_write_csv:
   csv_file_name: ans.csv  # 設定存放csv檔案名稱 預設為ans.csv
   data_delimiter: !!str "|"  # 設定csv資料分隔符號 預設為|
 
-
-# print-text:
-#   font_size: 100  # 設定印出文字時字體大小 預設為100
-#   font_path: ./setofont.ttf  # 設定印出文字時字體路徑 預設為./setofont.ttf
-#   shear_factor: 0.5  # 設定印出文字時斜度 預設為0.5
-#   Increase_interval: 0  # 增加畫出文字距離邊界的距離 預設為0 建議不要設定太大 會導致文字超出圖片
