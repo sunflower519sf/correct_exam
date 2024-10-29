@@ -1,5 +1,5 @@
 numpy == 1.23.5
-opencv-python == 4.10.0.84
+opencv-python
 PyYAML == 6.0
 gradio == 5.4.0
 imutils == 0.5.4
