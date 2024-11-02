@@ -25,7 +25,14 @@ https://docs.opencv.org/4.x/da/d5c/tutorial_canny_detector.html
 調整圖片大小
 https://steam.oxxostudio.tw/category/python/example/image-size.html
 
-# 查找指定圖片位置
+查找指定圖片位置
 https://pyimagesearch.com/2021/03/29/multi-template-matching-with-opencv/
 
+特徵點檢測
+https://stackoverflow.com/questions/67561760/orbs-detectandcompute-returns-none-for-a-slightly-different-image
 
+特徵匹配
+https://blog.csdn.net/uncle_ll/article/details/121661403
+
+清除線條(檢測答案時將表格邊線去除)
+https://stackoverflow.com/questions/60521925/how-to-detect-the-horizontal-and-vertical-lines-of-a-table-and-eliminate-the-noi

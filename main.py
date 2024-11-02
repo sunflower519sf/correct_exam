@@ -199,7 +199,7 @@ for filename in get_ans_file(os.listdir(folder_path), CONFIG):
         use_image = image[y:y+h, x:x+w]
     # 將圖片調整為指定大小
     use_image = cv2.resize(use_image, (CONFIG["find_table"]["crop_ratio_mult"]*12, CONFIG["find_table"]["crop_ratio_mult"]*13)) # 大概是12:13的比例
-
+    
     # 儲存空白用
     # cv2.imwrite("minus_blank.png", use_image)
 
@@ -207,11 +207,27 @@ for filename in get_ans_file(os.listdir(folder_path), CONFIG):
     # 預處理圖片
     use_image_preprocess = preprocess_image(use_image) # 裁切後的原始圖片
     minus_blank_preprocess = preprocess_image(minus_blank) # 空白答案卡
-    template_preprocess = preprocess_image(template) # 答案定位模板
     number_template_preprocess = preprocess_image(number_template) # 座號定位模板
+    template_preprocess = preprocess_image(template) # 答案定位模板
+
     # 將原有答案卡部分清除 只保留劃記痕跡
-    use_image_blank = cv2.subtract(use_image_preprocess, minus_blank_preprocess) 
-    
+    # use_image_blank = cv2.subtract(use_image_preprocess, minus_blank_preprocess) 
+    # 影像預處理(相對於常用的預處理不太一樣 )
+    use_img_gray = cv2.cvtColor(use_image, cv2.COLOR_BGR2GRAY)
+    use_img_blur = cv2.GaussianBlur(use_img_gray, (3,3), 0)
+    use_img_thresh = cv2.threshold(use_img_blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
+    # 檢測水平線
+    horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (100,1))
+    horizontal_mask = cv2.morphologyEx(use_img_thresh, cv2.MORPH_OPEN, horizontal_kernel, iterations=1)
+    # 檢測垂直線
+    vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1,100))
+    vertical_mask = cv2.morphologyEx(use_img_thresh, cv2.MORPH_OPEN, vertical_kernel, iterations=1)
+    # 合併水平線和垂直線
+    table_mask = cv2.bitwise_or(horizontal_mask, vertical_mask)
+    # 將答案卡中線條清除
+    use_image_blank = cv2.cvtColor(use_image_preprocess, cv2.COLOR_GRAY2BGR)
+    use_image_blank[np.where(table_mask==255)] = [0,0,0]
+    cv2.imwrite("out.png", use_image_blank)
     # 取得答案
     # 計算匹配值
     position_points = match_template(use_image_preprocess, template_preprocess, CONFIG)
@@ -228,7 +244,7 @@ for filename in get_ans_file(os.listdir(folder_path), CONFIG):
                 pos_x = position[0] + (option+1) * (0.43*CONFIG["find_table"]["crop_ratio_mult"]) + (option) * (0.045*CONFIG["find_table"]["crop_ratio_mult"])
                 
                 # 取得答案
-                get_ans_img = use_image_blank[int(pos_y)-22:int(pos_y)+22, int(pos_x)-18:int(pos_x)+18]
+                get_ans_img = use_image_blank[int(pos_y)-21:int(pos_y)+21, int(pos_x)-17:int(pos_x)+17]
                 
                 # 將圖片中內容放大
                 ans_img_dilated = cv2.dilate(get_ans_img, None, iterations=CONFIG["find_table"]["option_detect_expansion_degree"])
