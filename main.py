@@ -226,8 +226,8 @@ for filename in get_ans_file(os.listdir(folder_path), CONFIG):
     table_mask = cv2.bitwise_or(horizontal_mask, vertical_mask)
     # 將答案卡中線條清除
     use_image_blank = cv2.cvtColor(use_image_preprocess, cv2.COLOR_GRAY2BGR)
-    use_image_blank[np.where(table_mask==255)] = [0,0,0]
-    cv2.imwrite("out.png", use_image_blank)
+    use_image_blank[np.where(table_mask==255)] = [0,0,0] 
+    
     # 取得答案
     # 計算匹配值
     position_points = match_template(use_image_preprocess, template_preprocess, CONFIG)
@@ -297,7 +297,7 @@ for filename in get_ans_file(os.listdir(folder_path), CONFIG):
     if check_is_ans_file: 
         have_ans = all_ans_out.copy()
         save_data = ["ans", all_ans_out, 100]
-        write_csv(safe_filename(CONFIG['img']['ans_file_name']), filename, save_data)
+        write_csv(f'{safe_filename(CONFIG["img"]["ans_file_name"])}', filename, save_data)
         print(f"已找到答案檔案 {filename} 並用於評分")
         continue
 
@@ -305,7 +305,7 @@ for filename in get_ans_file(os.listdir(folder_path), CONFIG):
     if len(have_ans) <= 0:
         # 儲存答案
         save_data = [image_number, all_ans_out, 100]
-        write_csv(safe_filename(CONFIG['img']['ans_file_name']), filename, save_data)
+        write_csv(f'{safe_filename(CONFIG["img"]["ans_file_name"])}', filename, save_data)
     # 有答案
     else:
         # have_ans all_ans_out
@@ -319,5 +319,5 @@ for filename in get_ans_file(os.listdir(folder_path), CONFIG):
                     score += one_question_score
         # 儲存答案
         save_data = [image_number, all_ans_out, score]
-        write_csv(safe_filename(CONFIG['img']['ans_file_name']), filename, save_data)
+        write_csv(f'{safe_filename(CONFIG["img"]["ans_file_name"])}', filename, save_data)
 
