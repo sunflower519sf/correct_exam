@@ -36,3 +36,8 @@ https://blog.csdn.net/uncle_ll/article/details/121661403
 
 清除線條(檢測答案時將表格邊線去除)
 https://stackoverflow.com/questions/60521925/how-to-detect-the-horizontal-and-vertical-lines-of-a-table-and-eliminate-the-noi
+
+網頁製作
+https://github.com/gradio-app/gradio
+
+網頁執行程式

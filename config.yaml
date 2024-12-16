@@ -14,7 +14,7 @@ img:
 score_setting: 
   total_score: 100  # 設定總分 預設為100
   number_of_questions: 50  # 設定題目總數 預設為10
-  
+
 find_table: 
   line_expansion_degree: 1  # 設定尋找表格時線條擴張程度 預設為1 不建議超過10 通常用於線條太細時增加辨識出表格成功率 但過高可能導致字與表格混淆 導致出錯
   auto_perspective: !!bool true # 設定是否在裁減圖片時自動進行透視變換 用作於圖片有傾斜時使用 預設為false 
@@ -26,7 +26,7 @@ find_table:
   option_detect_domain_value: 50  # 設定檢測選項時的域值百分比 如過低可能錯誤的點也會被檢測 過高可能導致有劃記的選項被掠過 預設為50
   
 
-read_write_csv:
+read_write_csv: 
   csv_file_name: ans.csv  # 設定存放csv檔案名稱 預設為ans.csv
   data_delimiter: !!str "|"  # 設定csv資料分隔符號 預設為|
 

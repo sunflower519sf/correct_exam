@@ -2,4 +2,4 @@ numpy == 1.23.5
 opencv-python
 PyYAML == 6.0
 imutils == 0.5.4
-gradio == 5.4.0
+gradio
