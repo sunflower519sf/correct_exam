@@ -13,7 +13,7 @@ def preprocess_image(image):
 
 
 # Load image, grayscale, Gaussian blur, Otsu's threshold
-image = cv2.imread('img/ans.png')
+image = cv2.imread('test.png')
 thimg = preprocess_image(image)
 thimg = cv2.cvtColor(thimg, cv2.COLOR_GRAY2BGR)
 gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)

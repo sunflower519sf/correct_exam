@@ -23,10 +23,18 @@ def read_image_file(filename):
 # 影像預處理
 def preprocess_image(image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) # 灰階
-    thresh = cv2.adaptiveThreshold(gray, 255, 
-                                cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
-                                cv2.THRESH_BINARY_INV, 11, 2) # 二值化並反轉
-    return thresh
+    # 高斯模糊
+    blurred_image = cv2.GaussianBlur(gray, (5, 5), 0)
+    # 使用二值化
+    preprocessing_dualization = int(CONFIG["find_table"]["preprocessing_dualization"])
+    if preprocessing_dualization >= 255:
+        preprocessing_dualization = 255
+    elif preprocessing_dualization <= 0:
+        preprocessing_dualization = 0
+    _, binary_image = cv2.threshold(blurred_image, preprocessing_dualization, 255, cv2.THRESH_BINARY)
+    # 反轉圖片（黑色變白色，白色變黑色）
+    inverted_image = cv2.bitwise_not(binary_image)
+    return inverted_image
 
 # 計算匹配並回傳
 def match_template(old_image, template_image, CONFIG):
@@ -93,8 +101,6 @@ with open("config.yaml", "r", encoding="utf-8") as fr:
 
 # 載入答案定位圖片
 template = read_image_file(safe_filename(f'{CONFIG["img"]["contrast_folder"]}/{CONFIG["img"]["ans_template_file"]}'))
-# 載入空白答案卡
-minus_blank = read_image_file(safe_filename(f'{CONFIG["img"]["contrast_folder"]}/{CONFIG["img"]["minus_blank_file"]}'))
 # 載入座號定位圖片
 number_template = read_image_file(safe_filename(f'{CONFIG["img"]["contrast_folder"]}/{CONFIG["img"]["number_template_file"]}'))
 
@@ -198,7 +204,7 @@ for filename in get_ans_file(os.listdir(folder_path), CONFIG):
         x, y, w, h = cv2.boundingRect(contour_with_max_area)
         use_image = image[y:y+h, x:x+w]
     # 將圖片調整為指定大小
-    use_image = cv2.resize(use_image, (CONFIG["find_table"]["crop_ratio_mult"]*12, CONFIG["find_table"]["crop_ratio_mult"]*13)) # 大概是12:13的比例
+    use_image = cv2.resize(use_image, (CONFIG["find_table"]["crop_ratio_mult"]*12, CONFIG["find_table"]["crop_ratio_mult"]*13)) # 大概是12:13(寬:高)的比例
     
     # 儲存空白用
     # cv2.imwrite("minus_blank.png", use_image)
@@ -206,7 +212,6 @@ for filename in get_ans_file(os.listdir(folder_path), CONFIG):
     # 尋找出定位點
     # 預處理圖片
     use_image_preprocess = preprocess_image(use_image) # 裁切後的原始圖片
-    minus_blank_preprocess = preprocess_image(minus_blank) # 空白答案卡
     number_template_preprocess = preprocess_image(number_template) # 座號定位模板
     template_preprocess = preprocess_image(template) # 答案定位模板
 
@@ -233,36 +238,53 @@ for filename in get_ans_file(os.listdir(folder_path), CONFIG):
     position_points = match_template(use_image_preprocess, template_preprocess, CONFIG)
     # 存放答案用陣列
     all_ans_out = []
+    # 計算寬度間隔
+    position_quantity = len(position_points)
+    each_lattice_width = (CONFIG["find_table"]["crop_ratio_mult"]*12)/(1 if position_quantity < 1 else position_quantity)/(CONFIG["find_table"]["number_of_answers"]+1)
+    # 檢查用
     ct = 0
+    clone = use_image.copy()
+    ###
     for position in sorted(position_points):
+        # 計算高度間隔
+        each_lattice_height = ((CONFIG["find_table"]["crop_ratio_mult"]*13)-position[1])/(CONFIG["find_table"]["number_of_rows"]+1)
         # 計算格子座標
         ans_number_selected = []
         for number in range(CONFIG["find_table"]["number_of_rows"]):
-            pos_y = position[1] + (number+1) * (0.54*CONFIG["find_table"]["crop_ratio_mult"]) + (number+1) * (0.008*CONFIG["find_table"]["crop_ratio_mult"])
+            pos_y = position[1] + (number+1)*each_lattice_height
             ans_selected_option = []
             for option in range(CONFIG["find_table"]["number_of_answers"]):
-                pos_x = position[0] + (option+1) * (0.43*CONFIG["find_table"]["crop_ratio_mult"]) + (option) * (0.045*CONFIG["find_table"]["crop_ratio_mult"])
+                pos_x = position[0] + (option+1) * each_lattice_width
                 
                 # 取得答案
                 get_ans_img = use_image_blank[int(pos_y)-21:int(pos_y)+21, int(pos_x)-17:int(pos_x)+17]
                 
-                # 將圖片中內容放大
-                ans_img_dilated = cv2.dilate(get_ans_img, None, iterations=CONFIG["find_table"]["option_detect_expansion_degree"])
+                # 檢查用
+                # cv2.imwrite(f"abc/ans_img_{ct}_{number}_{option}.png", get_ans_img)
+                # cv2.rectangle(clone, (int(pos_x-each_lattice_width/(2*0.7)), int(pos_y-each_lattice_height/(2*0.7))), (int(pos_x+each_lattice_width/(2*0.7)), int(pos_y+each_lattice_height/(2*0.7))), (0, 0, 255), 1)
+                cv2.rectangle(clone, (int(pos_x), int(pos_y)), (int(pos_x), int(pos_y)), (0, 0, 255), 3)
+                cv2.imwrite(f"out.png", clone)
                 
-                # 計算像素點數量
-                total_pixels = ans_img_dilated.size
-                # 計算白色像素點數量
-                white_pixels = np.sum(ans_img_dilated > 200)
-                # 計算比率
-                white_pixel_ratio = white_pixels/total_pixels*100
-                if white_pixel_ratio > CONFIG["find_table"]["option_detect_domain_value"]:
-                    ans_selected_option.append(True)
-                else:
-                    ans_selected_option.append(False)
+                ###
+                # # 將圖片中內容放大
+                # ans_img_dilated = cv2.dilate(get_ans_img, None, iterations=CONFIG["find_table"]["option_detect_expansion_degree"])
+                
+                # # 計算像素點數量
+                # total_pixels = ans_img_dilated.size
+                # # 計算白色像素點數量
+                # white_pixels = np.sum(ans_img_dilated > 200)
+                # # 計算比率
+                # white_pixel_ratio = white_pixels/total_pixels*100
+                # if white_pixel_ratio > CONFIG["find_table"]["option_detect_domain_value"]:
+                #     ans_selected_option.append(True)
+                # else:
+                #     ans_selected_option.append(False)
             ans_number_selected.append(ans_selected_option)
         all_ans_out.append(ans_number_selected)
+        # 檢查用
         ct += 1
-    
+        
+        ###
     # 讀取座號
     # 計算匹配值 
     position_points_number = sorted(match_template(use_image_preprocess, number_template_preprocess, CONFIG), key=lambda x: x[1])[1:]
