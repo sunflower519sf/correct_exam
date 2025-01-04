@@ -37,7 +37,14 @@ https://blog.csdn.net/uncle_ll/article/details/121661403
 清除線條(檢測答案時將表格邊線去除)
 https://stackoverflow.com/questions/60521925/how-to-detect-the-horizontal-and-vertical-lines-of-a-table-and-eliminate-the-noi
 
+去除背景噪點
+https://steam.oxxostudio.tw/category/python/ai/opencv-blur.html
+
 網頁製作
 https://github.com/gradio-app/gradio
 
-網頁執行程式
+網頁展示頁面製作
+https://www.gradio.app/docs
+
+開啟文件夾
+https://github.com/gradio-app/gradio/issues/2515

@@ -2,7 +2,7 @@ import os
 import cv2
 import numpy as np
 import re
-from csvreadwrite import read_csv, write_csv
+from logreadwrite import read_csv, write_csv
 import yaml
 from imutils.object_detection import non_max_suppression
 import time
@@ -240,65 +240,71 @@ for filename in get_ans_file(os.listdir(folder_path), CONFIG):
     all_ans_out = []
     # 計算寬度間隔
     position_quantity = len(position_points)
-    each_lattice_width = (CONFIG["find_table"]["crop_ratio_mult"]*12)/(1 if position_quantity < 1 else position_quantity)/(CONFIG["find_table"]["number_of_answers"]+1)
-    # 檢查用
-    ct = 0
-    clone = use_image.copy()
-    ###
+    each_lattice_width = (CONFIG["find_table"]["crop_ratio_mult"]*11) / (1 if position_quantity < 1 else position_quantity) / (CONFIG["find_table"]["number_of_answers"]+1)
+    # # 檢查用
+    # ct = 0
+    # clone = use_image.copy()
+    # ###
     for position in sorted(position_points):
         # 計算高度間隔
-        each_lattice_height = ((CONFIG["find_table"]["crop_ratio_mult"]*13)-position[1])/(CONFIG["find_table"]["number_of_rows"]+1)
+        each_lattice_height = ((CONFIG["find_table"]["crop_ratio_mult"]*13)-position[1]) / (CONFIG["find_table"]["number_of_rows"]+1)
         # 計算格子座標
         ans_number_selected = []
         for number in range(CONFIG["find_table"]["number_of_rows"]):
-            pos_y = position[1] + (number+1)*each_lattice_height
+            pos_y = position[1] + (number+1)*each_lattice_height + number*0.02*CONFIG["find_table"]["crop_ratio_mult"]
             ans_selected_option = []
             for option in range(CONFIG["find_table"]["number_of_answers"]):
-                pos_x = position[0] + (option+1) * each_lattice_width
+                pos_x = position[0]-each_lattice_width/3 + (option+1)*each_lattice_width + option*0.04*CONFIG["find_table"]["crop_ratio_mult"]
                 
                 # 取得答案
-                get_ans_img = use_image_blank[int(pos_y)-21:int(pos_y)+21, int(pos_x)-17:int(pos_x)+17]
+                get_ans_img = use_image_blank[int(pos_y-each_lattice_height/3):int(pos_y+each_lattice_height/3), int(pos_x):int(pos_x+each_lattice_width/1.5-(each_lattice_width/20 if option >= CONFIG["find_table"]["number_of_answers"]-1 else 0))]
                 
-                # 檢查用
-                # cv2.imwrite(f"abc/ans_img_{ct}_{number}_{option}.png", get_ans_img)
-                # cv2.rectangle(clone, (int(pos_x-each_lattice_width/(2*0.7)), int(pos_y-each_lattice_height/(2*0.7))), (int(pos_x+each_lattice_width/(2*0.7)), int(pos_y+each_lattice_height/(2*0.7))), (0, 0, 255), 1)
-                cv2.rectangle(clone, (int(pos_x), int(pos_y)), (int(pos_x), int(pos_y)), (0, 0, 255), 3)
-                cv2.imwrite(f"out.png", clone)
+                # # 檢查用
+                # cv2.rectangle(clone, (int(pos_x), int(pos_y-each_lattice_height/3)), (int(pos_x+each_lattice_width/1.5-(each_lattice_width/20 if option >= CONFIG["find_table"]["number_of_answers"]-1 else 0)), int(pos_y+each_lattice_height/3)), (0, 0, 255), 3)
+                # cv2.imwrite(f"out.png", clone)
+                # ###
+
+                # 將圖片中內容放大
+                ans_img_dilated = cv2.dilate(get_ans_img, None, iterations=CONFIG["find_table"]["option_detect_expansion_degree"])
                 
-                ###
-                # # 將圖片中內容放大
-                # ans_img_dilated = cv2.dilate(get_ans_img, None, iterations=CONFIG["find_table"]["option_detect_expansion_degree"])
-                
-                # # 計算像素點數量
-                # total_pixels = ans_img_dilated.size
-                # # 計算白色像素點數量
-                # white_pixels = np.sum(ans_img_dilated > 200)
-                # # 計算比率
-                # white_pixel_ratio = white_pixels/total_pixels*100
-                # if white_pixel_ratio > CONFIG["find_table"]["option_detect_domain_value"]:
-                #     ans_selected_option.append(True)
-                # else:
-                #     ans_selected_option.append(False)
+                # 計算像素點數量
+                total_pixels = ans_img_dilated.size
+                # 計算白色像素點數量
+                white_pixels = np.sum(ans_img_dilated > 200)
+                # 計算比率
+                white_pixel_ratio = white_pixels/total_pixels*100
+                if white_pixel_ratio > CONFIG["find_table"]["option_detect_domain_value"]:
+                    ans_selected_option.append(True)
+                else:
+                    ans_selected_option.append(False)
             ans_number_selected.append(ans_selected_option)
         all_ans_out.append(ans_number_selected)
-        # 檢查用
-        ct += 1
+        # # 檢查用
+        # ct += 1
         
-        ###
+        # ###
     # 讀取座號
     # 計算匹配值 
     position_points_number = sorted(match_template(use_image_preprocess, number_template_preprocess, CONFIG), key=lambda x: x[1])[1:]
     
     # 計算座號
+    # # 檢查用
+    # clone = use_image.copy()
+    # ###
     seat_number = ["", ""]
     if len(position_points_number) == 2:
         for posnum in range(2):
             position = position_points_number[posnum]
             pos_y = position[1]
             for num in range(10):
-                pos_x = position[0] - (4.92*CONFIG["find_table"]["crop_ratio_mult"]) + (num) * (0.49*CONFIG["find_table"]["crop_ratio_mult"]) + (num) * (0.001*CONFIG["find_table"]["crop_ratio_mult"])
+                pos_x = position[0] - position[0]/12.5*(num+1) + position[0]/1550*(num)
+                
+                # # 檢查用
+                # cv2.rectangle(clone, (int(pos_x-0.17*CONFIG["find_table"]["crop_ratio_mult"]), int(pos_y-0.17*CONFIG["find_table"]["crop_ratio_mult"])), (int(pos_x+0.14*CONFIG["find_table"]["crop_ratio_mult"]), int(pos_y+0.17*CONFIG["find_table"]["crop_ratio_mult"])), (0, 0, 255), 3)
+                # cv2.imwrite(f"out.png", clone)
+                # ###
                 # 取得座號
-                get_number_img = use_image_blank[int(pos_y)-25:int(pos_y)+25, int(pos_x)-20:int(pos_x)+20]
+                get_number_img = use_image_blank[int(pos_y-0.17*CONFIG["find_table"]["crop_ratio_mult"]):int(pos_y+0.17*CONFIG["find_table"]["crop_ratio_mult"]), int(pos_x-0.17*CONFIG["find_table"]["crop_ratio_mult"]):int(pos_x+0.14*CONFIG["find_table"]["crop_ratio_mult"])]
                 # 將座號放大
                 number_img_dilated = cv2.dilate(get_number_img, None, iterations=CONFIG["find_table"]["option_detect_expansion_degree"])
                 # 計算像素點數量
@@ -308,7 +314,8 @@ for filename in get_ans_file(os.listdir(folder_path), CONFIG):
                 # 計算比率
                 white_pixel_ratio = white_pixels/total_pixels*100
                 if white_pixel_ratio > CONFIG["find_table"]["option_detect_domain_value"]:
-                    seat_number[posnum] += str(num)
+                    seat_number[posnum] += str(9-num)
+                    break
         # 格式化座號
         image_number = "".join(seat_number)
     else:
