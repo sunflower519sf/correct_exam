@@ -1,12 +1,13 @@
 import os
 import cv2
 import numpy as np
+from imutils.object_detection import non_max_suppression
 import re
 from logreadwrite import read_csv, write_csv
 import yaml
-from imutils.object_detection import non_max_suppression
 import time
-
+from datetime import datetime
+import math
 
 # 計算兩點距離
 def calculate_the_distance_between_2_points(points1, points2):
@@ -52,22 +53,49 @@ def match_template(old_image, template_image, CONFIG):
     position_points = [calculate_the_center_point_of_2_points(rect) for rect in template_pick]
     return position_points
 
-
 # 檔案或路徑名稱防呆
 def safe_filename(name:str):
     return name.replace("\\", "/").strip(".").strip("/")
+
+# 匯出檔案名稱防呆
+def safe_filename_export(name:str):
+    out = name.replace("\\", "/").strip("/")
+    return f'{out}/{datetime.now().strftime("%Y_%m_%d_%Hh%Mm%Ss")}.csv'
 
 # 陣列文字大小寫統一
 def safe_text(lst:list):
     return [char.lower() for char in lst]
 
-# 字串處理
-def safe_string(string:str):
-    return re.sub(r"[^a-zA-Z0-9]+", "", string).lower()
-
-# 防止座標超出
-def safe_coordinate(pos):
-    return 0 if pos < 0 else pos
+# 轉換為字母
+def convert_alphabet(data):
+    """
+    字母對照(參考考選部https://wwwc.moex.gov.tw/main/content/wHandMenuFile.ashx?file_id=404)
+    A:A, B:B, C:C, D:D,
+    F:AB, G:AC, H:AD,
+    J:BC, K:BD, M:CD,
+    P:ABC, Q:ABD, S:ACD
+    V:BCD, Z:ABCD, 未作答:=
+    """
+    if type(data) == list:
+        if data == [False, False, False, False]: return "="
+        elif data == [True, False, False, False]: return "A"
+        elif data == [False, True, False, False]: return "B"
+        elif data == [False, False, True, False]: return "C"
+        elif data == [False, False, False, True]: return "D"
+        elif data == [True, True, False, False]: return "F"
+        elif data == [True, False, True, False]: return "G"
+        elif data == [True, False, False, True]: return "H"
+        elif data == [False, True, True, False]: return "J"
+        elif data == [False, True, False, True]: return "K"
+        elif data == [False, False, True, True]: return "M"
+        elif data == [True, True, True, False]: return "P"
+        elif data == [True, True, False, True]: return "Q"
+        elif data == [True, False, True, True]: return "S"
+        elif data == [False, True, True, True]: return "V"
+        elif data == [True, True, True, True]: return "Z"
+        else: return "Error"
+    else:
+        return data
 
 # 取得答案檔
 def get_ans_file(all_img_file:list, CONFIG):
@@ -113,6 +141,10 @@ if not os.path.exists(folder_path):
 
 # 確保有答案
 have_ans = []
+# 記錄每題答錯人數
+question_error_count = [0]*CONFIG["score_setting"]["number_of_questions"]
+# 紀錄每人資料
+everyone_data = {}
 # 使用for提取資料夾中所有圖片
 for filename in get_ans_file(os.listdir(folder_path), CONFIG):
     filename = safe_filename(filename)
@@ -281,8 +313,8 @@ for filename in get_ans_file(os.listdir(folder_path), CONFIG):
         all_ans_out.append(ans_number_selected)
         # # 檢查用
         # ct += 1
-        
         # ###
+    
     # 讀取座號
     # 計算匹配值 
     position_points_number = sorted(match_template(use_image_preprocess, number_template_preprocess, CONFIG), key=lambda x: x[1])[1:]
@@ -322,31 +354,101 @@ for filename in get_ans_file(os.listdir(folder_path), CONFIG):
         # 無座號直接使用檔案名稱
         image_number = filename
     
+    # 紀錄時間
+    write_csv(f'{safe_filename(CONFIG["read_write_log"]["log_file_name"])}', f">>現在時間", datetime.strftime(datetime.now(), "%Y年%m月%d日%H點%M分%S秒"))
+    
     # 如果是答案就存起來
     if check_is_ans_file: 
         have_ans = all_ans_out.copy()
-        save_data = ["ans", all_ans_out, 100]
-        write_csv(f'{safe_filename(CONFIG["img"]["ans_file_name"])}', filename, save_data)
+        save_data = [CONFIG["img"]["ans_file_name"], all_ans_out, 100]
+        # everyone_data[CONFIG["img"]["ans_file_name"]] = [0, all_ans_out, CONFIG["score_setting"]["number_of_questions"], 100]
+        write_csv(f'{safe_filename(CONFIG["read_write_log"]["log_file_name"])}', filename, save_data)
         print(f"已找到答案檔案 {filename} 並用於評分")
         continue
 
+    
     # 確認是否有答案
     if len(have_ans) <= 0:
         # 儲存答案
-        save_data = [image_number, all_ans_out, 100]
-        write_csv(f'{safe_filename(CONFIG["img"]["ans_file_name"])}', filename, save_data)
+        save_data = [image_number, all_ans_out, -1]
+        everyone_data[image_number] = [int(image_number) if image_number.isdigit() else image_number, all_ans_out, -1, -1]
+        write_csv(f'{safe_filename(CONFIG["read_write_log"]["log_file_name"])}', filename, save_data)
     # 有答案
     else:
         # have_ans all_ans_out
         # 計算分數
-        score = 0
+        score_count = 0
         one_question_score = CONFIG["score_setting"]["total_score"]/CONFIG["score_setting"]["number_of_questions"]
         for column in range(len(all_ans_out)):
             for row in range(CONFIG["find_table"]["number_of_rows"]):
                 if (column*CONFIG["find_table"]["number_of_rows"]+row) > CONFIG["score_setting"]["number_of_questions"]:break
                 if have_ans[column][row] == all_ans_out[column][row]:
-                    score += one_question_score
+                    score_count += 1
+                    all_ans_out[column][row] = "-"
+                else:
+                    question_error_count[column*CONFIG["find_table"]["number_of_rows"]+row] += 1
+        score = math.ceil(score_count * one_question_score)
         # 儲存答案
         save_data = [image_number, all_ans_out, score]
-        write_csv(f'{safe_filename(CONFIG["img"]["ans_file_name"])}', filename, save_data)
+        everyone_data[image_number] = [int(image_number) if image_number.isdigit() else image_number, all_ans_out, score_count, score]
+        write_csv(f'{safe_filename(CONFIG["read_write_log"]["log_file_name"])}', filename, save_data)
+    continue
 
+# 將結果匯出成表格
+# 設定說明文字
+explanation_text = [
+    "符號說明,答案正確:-,答案錯誤:呈現學生答案,未作答:=",
+    "複選時代碼對照,A:A,B:B,C:C",
+    "D:D,F:AB,G:AC,H:AD",
+    "J:BC,K:BD,M:CD,P:ABC",
+    "Q:ABD,S:ACD,V:BCD,Z:ABCD"
+]
+explanation_count = 2
+with open(f'{safe_filename_export(CONFIG["img"]["folder_path"])}', "w", encoding="utf-8-sig") as csvfile:
+    # 寫入正確答案 如沒有填入空白
+    if len(have_ans) <= 0:
+        csvfile.write("\\     ,"+f'標準答案  ,{"  ,"*CONFIG["score_setting"]["number_of_questions"]}答對題數,得分  ')
+    else:
+        csvfile.write("\\     ,"+f'標準答案  ,')
+        for column in have_ans:
+            for row in column:
+                csvfile.write(f" {convert_alphabet(row)},")
+        csvfile.write(f'答對題數,得分  ')
+    # 第一行說明
+    csvfile.write(f",{explanation_text[0]}\n")
+    # 寫入題號
+    csvfile.write("座號  ,題號      ,",)
+    for num in range(CONFIG["score_setting"]["number_of_questions"]):
+        csvfile.write(f"{str(num+1).zfill(2)},")
+    # 第二行說明
+    csvfile.write(f'{" "*8},{" "*6},{explanation_text[1]}\n')
+    # 寫入學生答案
+    total_score = []
+    for number in sorted(everyone_data.items(), key=lambda x: (x[0], x[1])):
+        csvfile.write(f'{number[0]:4s}號,學生答案  ,')
+        for column in number[1][1]:
+            for row in column:
+                csvfile.write(f" {convert_alphabet(row)},")
+        csvfile.write(f'{str(number[1][2]):8s},{str(number[1][3]):6s}')
+        # 寫入後續說明
+        if explanation_count < len(explanation_text):
+            csvfile.write(f',{explanation_text[explanation_count]}\n')
+            explanation_count += 1
+        else:
+            csvfile.write('\n')
+        total_score.append(number[1][3])
+    # 補足說明部分
+    while explanation_count < len(explanation_text):
+        csvfile.write(f'{" "*6},{" "*10},{"  ,"*CONFIG["score_setting"]["number_of_questions"]}{" "*8},{" "*6},{explanation_text[explanation_count]}\n')
+        explanation_count += 1
+    csvfile.write(f'\\     ,答錯人數  ,')
+    for count in question_error_count:
+        csvfile.write(f'{str(count).zfill(2)},')
+    # 寫入平均
+    total_score = [score for score in total_score if score != -1]
+    csvfile.write(f'平均    ,{sum(total_score)/len(total_score):<6.1f}\n')
+    # 最高分
+    csvfile.write(f'{" "*6},{" "*10},{"  ,"*CONFIG["score_setting"]["number_of_questions"]}最高分  ,{max(total_score):<6d}\n')
+    # 最低分
+    csvfile.write(f'{" "*6},{" "*10},{"  ,"*CONFIG["score_setting"]["number_of_questions"]}最高分  ,{min(total_score):<6d}\n')
+    

@@ -12,7 +12,7 @@ img:
 
 score_setting: 
   total_score: 100  # 設定總分 預設為100
-  number_of_questions: 50  # 設定題目總數 預設為10
+  number_of_questions: 50  # 設定題目總數 預設為50
 
 find_table: 
   line_expansion_degree: 1  # 設定尋找表格時線條擴張程度 預設為1 不建議超過10 通常用於線條太細時增加辨識出表格成功率 但過高可能導致字與表格混淆 導致出錯
@@ -27,6 +27,6 @@ find_table:
   
 
 read_write_log: 
-  log_file_name: ans.log  # 設定存放log檔案名稱 預設為ans.log
+  log_file_name: src/log/ans.log  # 設定存放log檔案名稱 預設為ans.log
   data_delimiter: !!str "|"  # 設定csv資料分隔符號 預設為|
 

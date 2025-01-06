@@ -7,15 +7,6 @@ https://medium.com/ai%E5%8F%8D%E6%96%97%E5%9F%8E/python-%E6%9F%A5%E8%A9%A2%E8%B3
 影像處理文檔(opencv)
 https://docs.opencv.org/
 
-字形來源(瀨戶字體)
-https://zh-tw.osdn.net/projects/setofont/downloads/61995/setofont_v_6_20.zip/
-圖像上書寫文字
-https://shengyu7697.github.io/python-pil-draw-text-on-image/
-https://pillow.readthedocs.io/en/stable/reference/ImageDraw.html
-https://sean22492249.medium.com/%E7%94%A8-python-%E5%9C%A8%E5%9C%96%E5%83%8F%E4%B8%8A%E5%AF%AB%E5%AD%97-d62a431ea727
-文字傾斜
-https://stackoverflow.com/questions/7501009/affine-transform-in-pil-python
-
 影像預處理並讀出表格
 https://livefiredev.com/how-to-extract-table-from-image-in-python-opencv-ocr/
 

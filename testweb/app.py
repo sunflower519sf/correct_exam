@@ -17,4 +17,4 @@ iface = gr.Interface(
 if __name__ == "__main__":
 
     # iface.launch(share=True)
-    iface.launch()
+    iface.launch(inbrowser=True) # 自動於瀏覽器中開啟

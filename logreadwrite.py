@@ -8,7 +8,7 @@ delimiter = CONFIG["read_write_log"]["data_delimiter"]
 
 
 def safe_filename(name:str):
-    out = name.replace("\\", "/").strip("/").replace(".csv", "")
+    out = name.replace("\\", "/").strip("/").replace(".log", "")
     return f'{out}.log'
 
 
@@ -23,16 +23,16 @@ def read_csv(filename):
             lst[data[0]] = ast.literal_eval(data[1])
     return lst
 
-def write_dict_csv(filename, lst):
-    filename = safe_filename(filename)
-    with open(f'{filename}', 'w', encoding='utf-8') as csvfile:
-        for i in lst:
-            csvfile.write(f'{i}{delimiter}')
-            csvfile.write(str(lst[i]))
-            csvfile.write("\n")
+# def write_dict_csv(filename, lst:dict):
+#     filename = safe_filename(filename)
+#     with open(f'{filename}', 'w', encoding='utf-8') as csvfile:
+#         for i in lst:
+#             csvfile.write(f'{i}{delimiter}')
+#             csvfile.write(str(lst[i]))
+#             csvfile.write("\n")
 
 def write_csv(filename, keyname, value):
     filename = safe_filename(filename)
     with open(f'{filename}', 'a', encoding='utf-8') as csvfile:
         csvfile.write(f'{keyname}{delimiter}{str(value)}\n')
-
+    
