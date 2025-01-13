@@ -7,8 +7,10 @@ img:
   - webp
   ans_file_name: ans  # 設定存放答案用的檔案名稱 預設為ans 可以不用加入副檔名 但要注意是否有同名檔案 如果有疑慮 可以加上副檔名防止錯誤
   contrast_folder: src/img  # 設定模板資料夾路徑 預設為 src/img
+  pdf_to_img_folder: src/temp_img # 設定pdf轉圖片後的存放資料夾
   ans_template_file: ans_template.png  # 設定答案模板圖片路徑 預設為 template.png
   number_template_file: number_template.png  # 設定數字模板圖片路徑 預設為 number_template.png
+  interface: !!bool false  # 設定是否開啟介面 預設為true 關閉後不顯示介面
 
 score_setting: 
   total_score: 100  # 設定總分 預設為100
@@ -16,10 +18,10 @@ score_setting:
 
 find_table: 
   line_expansion_degree: 1  # 設定尋找表格時線條擴張程度 預設為1 不建議超過10 通常用於線條太細時增加辨識出表格成功率 但過高可能導致字與表格混淆 導致出錯
-  preprocessing_dualization: 200 # 設定在二質化時需要多大的強度(二質化會將圖片轉為黑白) 預設為200 0表示純黑 255表示純白 建議可以稍微偏白 檢測出來的消果比較好
+  preprocessing_dualization: 220 # 設定在二質化時需要多大的強度(二質化會將圖片轉為黑白) 預設為220 0表示純黑 255表示純白 建議可以稍微偏白 檢測出來的消果比較好
   auto_perspective: !!bool true # 設定是否在裁減圖片時自動進行透視變換 用作於圖片有傾斜時使用 預設為false 
   crop_ratio_mult: 100 # 設定裁切時圖片大小的倍數 如果設定過大會造成使用過多資源 但成功率更高 過低容易出錯或是檢測不到內容 預設為100
-  position_image_domain_value: 0.7 # 設定定位圖片時可接受的域值 過大可能導致定位失敗 過小可以定位錯誤 預設為0.7
+  position_image_domain_value: 0.6 # 設定定位圖片時可接受的域值 過大可能導致定位失敗 過小可以定位錯誤 預設為0.6
   number_of_answers: 4  # 設定每題答案數量 正常為A, B, C, D 共4個 預設為4
   number_of_rows: 10  # 設定每一排(從上往下)的數量 預設為10
   option_detect_expansion_degree: 20  # 設定檢測選項時的放大程度 用於在學生作答選擇該選項時將所選擇內容擴大增加檢測成功率 預設為20

@@ -2,12 +2,16 @@ import os
 import cv2
 import numpy as np
 from imutils.object_detection import non_max_suppression
+import math
 import re
-from logreadwrite import read_csv, write_csv
 import yaml
+import ast
 import time
 from datetime import datetime
-import math
+import gradio as gr
+from fitz import Document, Pixmap
+
+
 
 # 計算兩點距離
 def calculate_the_distance_between_2_points(points1, points2):
@@ -21,11 +25,46 @@ def calculate_the_center_point_of_2_points(points):
 def read_image_file(filename):
     return cv2.imdecode(np.fromfile(filename,dtype=np.uint8),-1)
 
+def log_safe_filename(name:str):
+    out = name.replace("\\", "/").strip("/").replace(".log", "")
+    return f'{out}.log'
+
+## 記錄檔使用
+# 讀取記錄檔
+def read_csv(filename):
+    global CONFIG
+    filename = log_safe_filename(filename)
+    lst = {}
+    with open(f'{filename}', 'r', encoding='utf-8') as csvfile:
+        linedata = csvfile.readlines()
+        for i in linedata:
+            data = i.strip().split(CONFIG["read_write_log"]["data_delimiter"])
+            # lst[data[0]] = eval(data[1]) 
+            lst[data[0]] = ast.literal_eval(data[1])
+    return lst
+
+# def write_dict_csv(filename, lst:dict):
+#     global CONFIG
+#     filename = safe_filename(filename)
+#     with open(f'{filename}', 'w', encoding='utf-8') as csvfile:
+#         for i in lst:
+#             csvfile.write(f'{i}{CONFIG["read_write_log"]["data_delimiter"]}')
+#             csvfile.write(str(lst[i]))
+#             csvfile.write("\n")
+
+# 寫入記錄檔
+def write_csv(filename, keyname, value):
+    global CONFIG
+    filename = log_safe_filename(filename)
+    with open(f'{filename}', 'a', encoding='utf-8') as csvfile:
+        csvfile.write(f'{keyname}{CONFIG["read_write_log"]["data_delimiter"]}{str(value)}\n')
+##
+
 # 影像預處理
 def preprocess_image(image):
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) # 灰階
     # 高斯模糊
-    blurred_image = cv2.GaussianBlur(gray, (5, 5), 0)
+    blurred_image = cv2.GaussianBlur(gray, (11, 11), 0)
     # 使用二值化
     preprocessing_dualization = int(CONFIG["find_table"]["preprocessing_dualization"])
     if preprocessing_dualization >= 255:
@@ -39,6 +78,8 @@ def preprocess_image(image):
 
 # 計算匹配並回傳
 def match_template(old_image, template_image, CONFIG):
+    old_image = cv2.dilate(old_image, None, iterations=1)
+    template_image = cv2.dilate(template_image, None, iterations=1)
     result = cv2.matchTemplate(old_image, template_image,
 	cv2.TM_CCOEFF_NORMED)
     # 找出匹配值高於設定值的部分
@@ -65,6 +106,21 @@ def safe_filename_export(name:str):
 # 陣列文字大小寫統一
 def safe_text(lst:list):
     return [char.lower() for char in lst]
+
+# 格式化座號
+def format_number(number):
+    number = str(number).replace(" ", "").zfill(2)
+    if number == "": return "00"
+    return number
+
+# 檢查字典
+def check_dict(data, key):
+    if key not in data: return False, key
+    count = 1
+    while key in data:
+        key = f"{key}_{count}"
+        count += 1
+    return True, key
 
 # 轉換為字母
 def convert_alphabet(data):
@@ -127,6 +183,7 @@ def get_ans_file(all_img_file:list, CONFIG):
 with open("config.yaml", "r", encoding="utf-8") as fr:
     CONFIG = yaml.safe_load(fr)
 
+
 # 載入答案定位圖片
 template = read_image_file(safe_filename(f'{CONFIG["img"]["contrast_folder"]}/{CONFIG["img"]["ans_template_file"]}'))
 # 載入座號定位圖片
@@ -138,317 +195,382 @@ if not os.path.exists(folder_path):
     os.makedirs(folder_path)
     print(f"ERROR: 查無此資料夾 以自動建立資料夾 {CONFIG['img']['folder_path']}")
 
+# 主程式
+def main_function():
+    # 確保有答案
+    have_ans = []
+    # 記錄每題答錯人數
+    question_error_count = [0]*CONFIG["score_setting"]["number_of_questions"]
+    # 紀錄每人資料
+    everyone_data = {}
+    # 使用for提取資料夾中所有圖片
+    for filename in get_ans_file(os.listdir(folder_path), CONFIG):
+        filename = safe_filename(filename)
+        print(filename)
+        # 檢測是否符合格式 增加一個條件用於檢測答案檔
+        check_is_ans_file = False
 
-# 確保有答案
-have_ans = []
-# 記錄每題答錯人數
-question_error_count = [0]*CONFIG["score_setting"]["number_of_questions"]
-# 紀錄每人資料
-everyone_data = {}
-# 使用for提取資料夾中所有圖片
-for filename in get_ans_file(os.listdir(folder_path), CONFIG):
-    filename = safe_filename(filename)
-    print(filename)
-    # 檢測是否符合格式 增加一個條件用於檢測答案檔
-    check_is_ans_file = False
-
-    # 判斷是否為答案檔案
-    check_file_name = filename.split(".")[-1].lower() 
-    if check_file_name == "ansfile?":
-        ans_file_split = filename.split("/")
-        if ans_file_split[-1] == "ansfile?.ansfile?":
-            filename = ans_file_split[0]
-            check_is_ans_file = True
-        elif ans_file_split[-1] == "nofile?.ansfile?":
-            print(f"ERROR: 找不到指定的答案檔案")
+        # 判斷是否為答案檔案
+        check_file_name = filename.split(".")[-1].lower() 
+        if check_file_name == "ansfile?":
+            ans_file_split = filename.split("/")
+            if ans_file_split[-1] == "ansfile?.ansfile?":
+                filename = ans_file_split[0]
+                check_is_ans_file = True
+            elif ans_file_split[-1] == "nofile?.ansfile?":
+                print(f"ERROR: 找不到指定的答案檔案")
+                continue
+        elif not check_file_name in safe_text(CONFIG["img"]["format"]):
+            print(f"ERROR: {filename} 不是符合要求的圖片格式 以下是可接受的格式:\n{', '.join(CONFIG['img']['format'])}")
             continue
-    elif not check_file_name in safe_text(CONFIG["img"]["format"]):
-        print(f"ERROR: {filename} 不是符合要求的圖片格式 以下是可接受的格式:\n{', '.join(CONFIG['img']['format'])}")
-        continue
 
-    # 讀取影像
-    image = read_image_file(f"{safe_filename(CONFIG['img']['folder_path'])}/{filename}")
-    if image is None:
-        print(f"ERROR: 讀取 {filename} 失敗")
-        continue
+        # 讀取影像
+        image = read_image_file(f"{safe_filename(CONFIG['img']['folder_path'])}/{filename}")
+        if image is None:
+            print(f"ERROR: 讀取 {filename} 失敗")
+            continue
 
-    # 影像預處理
-    thresh = preprocess_image(image)
-    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    
-    # 過濾輪廓並找出矩形 並指定最大值
-    max_area = 0
-    contour_with_max_area = None
-    for contour in contours:
-        peri = cv2.arcLength(contour, True)
-        approx = cv2.approxPolyDP(contour, 0.02 * peri, True)
-        if len(approx) == 4:
-            area = cv2.contourArea(contour)
-            if area > max_area:
-                max_area = area
-                contour_with_max_area = approx
-    if contour_with_max_area is None:
-        print(f"Error: {filename} 找不到有效的矩形")
-        continue
-    
-    # 使用透視變換切割圖片
-    if CONFIG["find_table"]["auto_perspective"]:
-        # 重塑矩形
-        sorting_pos_pts = np.array(contour_with_max_area).reshape(4, 2)
-        # 建立一個存放最後結果的矩形
-        contour_with_max_area_ordered = np.zeros((4, 2), dtype="float32")
-
-        # 找出左上角和右下角
-        sorting_pos_s = [sum(i) for i in sorting_pos_pts]
-        contour_with_max_area_ordered[0] = sorting_pos_pts[np.argmin(sorting_pos_s)]
-        contour_with_max_area_ordered[2] = sorting_pos_pts[np.argmax(sorting_pos_s)]
-
-        # 找出右上角和左下角
-        sorting_pos_diff = np.diff(sorting_pos_pts, axis=1)
-        contour_with_max_area_ordered[1] = sorting_pos_pts[np.argmin(sorting_pos_diff)]
-        contour_with_max_area_ordered[3] = sorting_pos_pts[np.argmax(sorting_pos_diff)]
+        # 影像預處理
+        thresh = preprocess_image(image)
+        # 檢測用法大圖片
+        thresh = cv2.dilate(preprocess_image(image), None, iterations=2)
+        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
-        # 取得圖像寬度
-        existing_image_width = image.shape[1]
-
-        # 計算左上角到右上角的距離
-        distance_between_top_left_and_top_right = calculate_the_distance_between_2_points(contour_with_max_area_ordered[0], contour_with_max_area_ordered[1])
-        # 計算左上角到左下角的距離
-        distance_between_top_left_and_bottom_left = calculate_the_distance_between_2_points(contour_with_max_area_ordered[0], contour_with_max_area_ordered[3])
-
-        # 計算長寬比
-        aspect_ratio = distance_between_top_left_and_bottom_left / distance_between_top_left_and_top_right
+        # 過濾輪廓並找出矩形 並指定最大值
+        max_area = 0
+        contour_with_max_area = None
+        for contour in contours:
+            peri = cv2.arcLength(contour, True)
+            approx = cv2.approxPolyDP(contour, 0.02 * peri, True)
+            if len(approx) == 4:
+                area = cv2.contourArea(contour)
+                if area > max_area:
+                    max_area = area
+                    contour_with_max_area = approx
+        if contour_with_max_area is None:
+            print(f"Error: {filename} 找不到有效的矩形")
+            continue
         
-        # 設定新圖像的長寬
-        new_image_width = existing_image_width
-        new_image_height = int(new_image_width * aspect_ratio)
+        # 使用透視變換切割圖片
+        if CONFIG["find_table"]["auto_perspective"]:
+            # 重塑矩形
+            sorting_pos_pts = np.array(contour_with_max_area).reshape(4, 2)
+            # 建立一個存放最後結果的矩形
+            contour_with_max_area_ordered = np.zeros((4, 2), dtype="float32")
 
-        # 透視變換
-        perspective_transform_pts1 = np.float32(contour_with_max_area_ordered)
-        perspective_transform_pts2 = np.float32([[0, 0], [new_image_width, 0], [new_image_width, new_image_height], [0, new_image_height]])
-        # 計算透視變換矩陣(好像是把pts1映射到pts2)
-        perspective_transform_matrix = cv2.getPerspectiveTransform(perspective_transform_pts1, perspective_transform_pts2)
-        # 將它應用到圖像上 perspective_transformed_image就是表格了
-        use_image = cv2.warpPerspective(image, perspective_transform_matrix, (new_image_width, new_image_height))
+            # 找出左上角和右下角
+            sorting_pos_s = [sum(i) for i in sorting_pos_pts]
+            contour_with_max_area_ordered[0] = sorting_pos_pts[np.argmin(sorting_pos_s)]
+            contour_with_max_area_ordered[2] = sorting_pos_pts[np.argmax(sorting_pos_s)]
 
-    # 直接檢測方格裁切
-    else:
-        x, y, w, h = cv2.boundingRect(contour_with_max_area)
-        use_image = image[y:y+h, x:x+w]
-    # 將圖片調整為指定大小
-    use_image = cv2.resize(use_image, (CONFIG["find_table"]["crop_ratio_mult"]*12, CONFIG["find_table"]["crop_ratio_mult"]*13)) # 大概是12:13(寬:高)的比例
-    
-    # 儲存空白用
-    # cv2.imwrite("minus_blank.png", use_image)
+            # 找出右上角和左下角
+            sorting_pos_diff = np.diff(sorting_pos_pts, axis=1)
+            contour_with_max_area_ordered[1] = sorting_pos_pts[np.argmin(sorting_pos_diff)]
+            contour_with_max_area_ordered[3] = sorting_pos_pts[np.argmax(sorting_pos_diff)]
+            
+            # 取得圖像寬度
+            existing_image_width = image.shape[1]
 
-    # 尋找出定位點
-    # 預處理圖片
-    use_image_preprocess = preprocess_image(use_image) # 裁切後的原始圖片
-    number_template_preprocess = preprocess_image(number_template) # 座號定位模板
-    template_preprocess = preprocess_image(template) # 答案定位模板
+            # 計算左上角到右上角的距離
+            distance_between_top_left_and_top_right = calculate_the_distance_between_2_points(contour_with_max_area_ordered[0], contour_with_max_area_ordered[1])
+            # 計算左上角到左下角的距離
+            distance_between_top_left_and_bottom_left = calculate_the_distance_between_2_points(contour_with_max_area_ordered[0], contour_with_max_area_ordered[3])
 
-    # 將原有答案卡部分清除 只保留劃記痕跡
-    # use_image_blank = cv2.subtract(use_image_preprocess, minus_blank_preprocess) 
-    # 影像預處理(相對於常用的預處理不太一樣 )
-    use_img_gray = cv2.cvtColor(use_image, cv2.COLOR_BGR2GRAY)
-    use_img_blur = cv2.GaussianBlur(use_img_gray, (3,3), 0)
-    use_img_thresh = cv2.threshold(use_img_blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
-    # 檢測水平線
-    horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (100,1))
-    horizontal_mask = cv2.morphologyEx(use_img_thresh, cv2.MORPH_OPEN, horizontal_kernel, iterations=1)
-    # 檢測垂直線
-    vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1,100))
-    vertical_mask = cv2.morphologyEx(use_img_thresh, cv2.MORPH_OPEN, vertical_kernel, iterations=1)
-    # 合併水平線和垂直線
-    table_mask = cv2.bitwise_or(horizontal_mask, vertical_mask)
-    # 將答案卡中線條清除
-    use_image_blank = cv2.cvtColor(use_image_preprocess, cv2.COLOR_GRAY2BGR)
-    use_image_blank[np.where(table_mask==255)] = [0,0,0] 
-    
-    # 取得答案
-    # 計算匹配值
-    position_points = match_template(use_image_preprocess, template_preprocess, CONFIG)
-    # 存放答案用陣列
-    all_ans_out = []
-    # 計算寬度間隔
-    position_quantity = len(position_points)
-    each_lattice_width = (CONFIG["find_table"]["crop_ratio_mult"]*11) / (1 if position_quantity < 1 else position_quantity) / (CONFIG["find_table"]["number_of_answers"]+1)
-    # # 檢查用
-    # ct = 0
-    # clone = use_image.copy()
-    # ###
-    for position in sorted(position_points):
-        # 計算高度間隔
-        each_lattice_height = ((CONFIG["find_table"]["crop_ratio_mult"]*13)-position[1]) / (CONFIG["find_table"]["number_of_rows"]+1)
-        # 計算格子座標
-        ans_number_selected = []
-        for number in range(CONFIG["find_table"]["number_of_rows"]):
-            pos_y = position[1] + (number+1)*each_lattice_height + number*0.02*CONFIG["find_table"]["crop_ratio_mult"]
-            ans_selected_option = []
-            for option in range(CONFIG["find_table"]["number_of_answers"]):
-                pos_x = position[0]-each_lattice_width/3 + (option+1)*each_lattice_width + option*0.04*CONFIG["find_table"]["crop_ratio_mult"]
-                
-                # 取得答案
-                get_ans_img = use_image_blank[int(pos_y-each_lattice_height/3):int(pos_y+each_lattice_height/3), int(pos_x):int(pos_x+each_lattice_width/1.5-(each_lattice_width/20 if option >= CONFIG["find_table"]["number_of_answers"]-1 else 0))]
-                
-                # # 檢查用
-                # cv2.rectangle(clone, (int(pos_x), int(pos_y-each_lattice_height/3)), (int(pos_x+each_lattice_width/1.5-(each_lattice_width/20 if option >= CONFIG["find_table"]["number_of_answers"]-1 else 0)), int(pos_y+each_lattice_height/3)), (0, 0, 255), 3)
-                # cv2.imwrite(f"out.png", clone)
-                # ###
+            # 計算長寬比
+            aspect_ratio = distance_between_top_left_and_bottom_left / distance_between_top_left_and_top_right
+            
+            # 設定新圖像的長寬
+            new_image_width = existing_image_width
+            new_image_height = int(new_image_width * aspect_ratio)
 
-                # 將圖片中內容放大
-                ans_img_dilated = cv2.dilate(get_ans_img, None, iterations=CONFIG["find_table"]["option_detect_expansion_degree"])
-                
-                # 計算像素點數量
-                total_pixels = ans_img_dilated.size
-                # 計算白色像素點數量
-                white_pixels = np.sum(ans_img_dilated > 200)
-                # 計算比率
-                white_pixel_ratio = white_pixels/total_pixels*100
-                if white_pixel_ratio > CONFIG["find_table"]["option_detect_domain_value"]:
-                    ans_selected_option.append(True)
-                else:
-                    ans_selected_option.append(False)
-            ans_number_selected.append(ans_selected_option)
-        all_ans_out.append(ans_number_selected)
-        # # 檢查用
-        # ct += 1
-        # ###
-    
-    # 讀取座號
-    # 計算匹配值 
-    position_points_number = sorted(match_template(use_image_preprocess, number_template_preprocess, CONFIG), key=lambda x: x[1])[1:]
-    
-    # 計算座號
-    # # 檢查用
-    # clone = use_image.copy()
-    # ###
-    seat_number = ["", ""]
-    if len(position_points_number) == 2:
-        for posnum in range(2):
-            position = position_points_number[posnum]
-            pos_y = position[1]
-            for num in range(10):
-                pos_x = position[0] - position[0]/12.5*(num+1) + position[0]/1550*(num)
-                
-                # # 檢查用
-                # cv2.rectangle(clone, (int(pos_x-0.17*CONFIG["find_table"]["crop_ratio_mult"]), int(pos_y-0.17*CONFIG["find_table"]["crop_ratio_mult"])), (int(pos_x+0.14*CONFIG["find_table"]["crop_ratio_mult"]), int(pos_y+0.17*CONFIG["find_table"]["crop_ratio_mult"])), (0, 0, 255), 3)
-                # cv2.imwrite(f"out.png", clone)
-                # ###
-                # 取得座號
-                get_number_img = use_image_blank[int(pos_y-0.17*CONFIG["find_table"]["crop_ratio_mult"]):int(pos_y+0.17*CONFIG["find_table"]["crop_ratio_mult"]), int(pos_x-0.17*CONFIG["find_table"]["crop_ratio_mult"]):int(pos_x+0.14*CONFIG["find_table"]["crop_ratio_mult"])]
-                # 將座號放大
-                number_img_dilated = cv2.dilate(get_number_img, None, iterations=CONFIG["find_table"]["option_detect_expansion_degree"])
-                # 計算像素點數量
-                total_pixels = number_img_dilated.size
-                # 計算白色像素點數量
-                white_pixels = np.sum(number_img_dilated > 200)
-                # 計算比率
-                white_pixel_ratio = white_pixels/total_pixels*100
-                if white_pixel_ratio > CONFIG["find_table"]["option_detect_domain_value"]:
-                    seat_number[posnum] += str(9-num)
-                    break
-        # 格式化座號
-        image_number = "".join(seat_number)
-    else:
-        # 無座號直接使用檔案名稱
-        image_number = filename
-    
-    # 紀錄時間
-    write_csv(f'{safe_filename(CONFIG["read_write_log"]["log_file_name"])}', f">>現在時間", datetime.strftime(datetime.now(), "%Y年%m月%d日%H點%M分%S秒"))
-    
-    # 如果是答案就存起來
-    if check_is_ans_file: 
-        have_ans = all_ans_out.copy()
-        save_data = [CONFIG["img"]["ans_file_name"], all_ans_out, 100]
-        # everyone_data[CONFIG["img"]["ans_file_name"]] = [0, all_ans_out, CONFIG["score_setting"]["number_of_questions"], 100]
-        write_csv(f'{safe_filename(CONFIG["read_write_log"]["log_file_name"])}', filename, save_data)
-        print(f"已找到答案檔案 {filename} 並用於評分")
-        continue
+            # 透視變換
+            perspective_transform_pts1 = np.float32(contour_with_max_area_ordered)
+            perspective_transform_pts2 = np.float32([[0, 0], [new_image_width, 0], [new_image_width, new_image_height], [0, new_image_height]])
+            # 計算透視變換矩陣(好像是把pts1映射到pts2)
+            perspective_transform_matrix = cv2.getPerspectiveTransform(perspective_transform_pts1, perspective_transform_pts2)
+            # 將它應用到圖像上 perspective_transformed_image就是表格了
+            use_image = cv2.warpPerspective(image, perspective_transform_matrix, (new_image_width, new_image_height))
 
-    
-    # 確認是否有答案
-    if len(have_ans) <= 0:
-        # 儲存答案
-        save_data = [image_number, all_ans_out, -1]
-        everyone_data[image_number] = [int(image_number) if image_number.isdigit() else image_number, all_ans_out, -1, -1]
-        write_csv(f'{safe_filename(CONFIG["read_write_log"]["log_file_name"])}', filename, save_data)
-    # 有答案
-    else:
-        # have_ans all_ans_out
-        # 計算分數
-        score_count = 0
-        one_question_score = CONFIG["score_setting"]["total_score"]/CONFIG["score_setting"]["number_of_questions"]
-        for column in range(len(all_ans_out)):
-            for row in range(CONFIG["find_table"]["number_of_rows"]):
-                if (column*CONFIG["find_table"]["number_of_rows"]+row) > CONFIG["score_setting"]["number_of_questions"]:break
-                if have_ans[column][row] == all_ans_out[column][row]:
-                    score_count += 1
-                    all_ans_out[column][row] = "-"
-                else:
-                    question_error_count[column*CONFIG["find_table"]["number_of_rows"]+row] += 1
-        score = math.ceil(score_count * one_question_score)
-        # 儲存答案
-        save_data = [image_number, all_ans_out, score]
-        everyone_data[image_number] = [int(image_number) if image_number.isdigit() else image_number, all_ans_out, score_count, score]
-        write_csv(f'{safe_filename(CONFIG["read_write_log"]["log_file_name"])}', filename, save_data)
-    continue
-
-# 將結果匯出成表格
-# 設定說明文字
-explanation_text = [
-    "符號說明,答案正確:-,答案錯誤:呈現學生答案,未作答:=",
-    "複選時代碼對照,A:A,B:B,C:C",
-    "D:D,F:AB,G:AC,H:AD",
-    "J:BC,K:BD,M:CD,P:ABC",
-    "Q:ABD,S:ACD,V:BCD,Z:ABCD"
-]
-explanation_count = 2
-with open(f'{safe_filename_export(CONFIG["img"]["folder_path"])}', "w", encoding="utf-8-sig") as csvfile:
-    # 寫入正確答案 如沒有填入空白
-    if len(have_ans) <= 0:
-        csvfile.write("\\     ,"+f'標準答案  ,{"  ,"*CONFIG["score_setting"]["number_of_questions"]}答對題數,得分  ')
-    else:
-        csvfile.write("\\     ,"+f'標準答案  ,')
-        for column in have_ans:
-            for row in column:
-                csvfile.write(f" {convert_alphabet(row)},")
-        csvfile.write(f'答對題數,得分  ')
-    # 第一行說明
-    csvfile.write(f",{explanation_text[0]}\n")
-    # 寫入題號
-    csvfile.write("座號  ,題號      ,",)
-    for num in range(CONFIG["score_setting"]["number_of_questions"]):
-        csvfile.write(f"{str(num+1).zfill(2)},")
-    # 第二行說明
-    csvfile.write(f'{" "*8},{" "*6},{explanation_text[1]}\n')
-    # 寫入學生答案
-    total_score = []
-    for number in sorted(everyone_data.items(), key=lambda x: (x[0], x[1])):
-        csvfile.write(f'{number[0]:4s}號,學生答案  ,')
-        for column in number[1][1]:
-            for row in column:
-                csvfile.write(f" {convert_alphabet(row)},")
-        csvfile.write(f'{str(number[1][2]):8s},{str(number[1][3]):6s}')
-        # 寫入後續說明
-        if explanation_count < len(explanation_text):
-            csvfile.write(f',{explanation_text[explanation_count]}\n')
-            explanation_count += 1
+        # 直接檢測方格裁切
         else:
-            csvfile.write('\n')
-        total_score.append(number[1][3])
-    # 補足說明部分
-    while explanation_count < len(explanation_text):
-        csvfile.write(f'{" "*6},{" "*10},{"  ,"*CONFIG["score_setting"]["number_of_questions"]}{" "*8},{" "*6},{explanation_text[explanation_count]}\n')
-        explanation_count += 1
-    csvfile.write(f'\\     ,答錯人數  ,')
-    for count in question_error_count:
-        csvfile.write(f'{str(count).zfill(2)},')
-    # 寫入平均
-    total_score = [score for score in total_score if score != -1]
-    csvfile.write(f'平均    ,{sum(total_score)/len(total_score):<6.1f}\n')
-    # 最高分
-    csvfile.write(f'{" "*6},{" "*10},{"  ,"*CONFIG["score_setting"]["number_of_questions"]}最高分  ,{max(total_score):<6d}\n')
-    # 最低分
-    csvfile.write(f'{" "*6},{" "*10},{"  ,"*CONFIG["score_setting"]["number_of_questions"]}最高分  ,{min(total_score):<6d}\n')
-    
+            x, y, w, h = cv2.boundingRect(contour_with_max_area)
+            use_image = image[y:y+h, x:x+w]
+        # 將圖片調整為指定大小
+        use_image = cv2.resize(use_image, (CONFIG["find_table"]["crop_ratio_mult"]*12, CONFIG["find_table"]["crop_ratio_mult"]*13)) # 大概是12:13(寬:高)的比例
+        
+        # 儲存空白用
+        # cv2.imwrite("minus_blank.png", use_image)
+
+        # 尋找出定位點
+        # 預處理圖片
+        use_image_preprocess = preprocess_image(use_image) # 裁切後的原始圖片
+        number_template_preprocess = preprocess_image(number_template) # 座號定位模板
+        template_preprocess = preprocess_image(template) # 答案定位模板
+
+        # 將原有答案卡部分清除 只保留劃記痕跡
+        # use_image_blank = cv2.subtract(use_image_preprocess, minus_blank_preprocess) 
+        # 影像預處理(相對於常用的預處理不太一樣 )
+        use_img_gray = cv2.cvtColor(use_image, cv2.COLOR_BGR2GRAY)
+        use_img_blur = cv2.GaussianBlur(use_img_gray, (3,3), 0)
+        use_img_thresh = cv2.threshold(use_img_blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
+        # 檢測水平線
+        horizontal_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (100,1))
+        horizontal_mask = cv2.morphologyEx(use_img_thresh, cv2.MORPH_OPEN, horizontal_kernel, iterations=1)
+        # 檢測垂直線
+        vertical_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1,100))
+        vertical_mask = cv2.morphologyEx(use_img_thresh, cv2.MORPH_OPEN, vertical_kernel, iterations=1)
+        # 合併水平線和垂直線
+        table_mask = cv2.bitwise_or(horizontal_mask, vertical_mask)
+        # 將答案卡中線條清除
+        use_image_blank = cv2.cvtColor(use_image_preprocess, cv2.COLOR_GRAY2BGR)
+        use_image_blank[np.where(table_mask==255)] = [0,0,0] 
+        
+        # 取得答案
+        # 計算匹配值
+        position_points = match_template(use_image_preprocess, template_preprocess, CONFIG)
+        # 存放答案用陣列
+        all_ans_out = []
+        # 計算寬度間隔
+        position_quantity = len(position_points)
+        each_lattice_width = (CONFIG["find_table"]["crop_ratio_mult"]*11) / (1 if position_quantity < 1 else position_quantity) / (CONFIG["find_table"]["number_of_answers"]+1)
+        # 檢查用
+        # ct = 0
+        # clone = use_image.copy()
+        ###
+        break_check = False
+        for position in sorted(position_points):
+            # 計算高度間隔
+            each_lattice_height = ((CONFIG["find_table"]["crop_ratio_mult"]*13)-position[1]) / (CONFIG["find_table"]["number_of_rows"]+1)
+            # 計算格子座標
+            ans_number_selected = []
+            for number in range(CONFIG["find_table"]["number_of_rows"]):
+                # 檢測超出範圍退出
+                if len(all_ans_out)*CONFIG["find_table"]["number_of_rows"]+len(ans_number_selected) >= CONFIG["score_setting"]["number_of_questions"]:
+                    break_check = True
+                    break
+                # 計算高度
+                pos_y = position[1]+each_lattice_width/20 + (number+1)*each_lattice_height + number/3*each_lattice_height*0.1
+                ans_selected_option = []
+                for option in range(CONFIG["find_table"]["number_of_answers"]):
+                    # 計算寬度
+                    pos_x = position[0]-each_lattice_width/3.1 + (option+1)*each_lattice_width + option*each_lattice_width*0.06
+                    
+                    # 取得答案
+                    get_ans_img = use_image_blank[int(pos_y-each_lattice_height/3):int(pos_y+each_lattice_height/3), int(pos_x):int(pos_x+each_lattice_width/1.5-(each_lattice_width/20 if option >= CONFIG["find_table"]["number_of_answers"]-1 else 0))]
+                    
+                    # 檢查用
+                    # cv2.rectangle(clone, (int(pos_x), int(pos_y-each_lattice_height/3)), (int(pos_x+each_lattice_width/1.5-(each_lattice_width/20 if option >= CONFIG["find_table"]["number_of_answers"]-1 else 0)), int(pos_y+each_lattice_height/3)), (0, 0, 255), 1)
+                    # cv2.imwrite(f"out.png", clone)
+                    ###
+
+                    # 將圖片中內容放大
+                    ans_img_dilated = cv2.dilate(get_ans_img, None, iterations=CONFIG["find_table"]["option_detect_expansion_degree"])
+                    
+                    # 計算像素點數量
+                    total_pixels = ans_img_dilated.size
+                    # 計算白色像素點數量
+                    white_pixels = np.sum(ans_img_dilated > 200)
+                    # 計算比率
+                    white_pixel_ratio = white_pixels/total_pixels*100
+                    if white_pixel_ratio > CONFIG["find_table"]["option_detect_domain_value"]:
+                        ans_selected_option.append(True)
+                    else:
+                        ans_selected_option.append(False)
+                ans_number_selected.append(ans_selected_option)
+                # 達到設定值退出
+                
+            all_ans_out.append(ans_number_selected)
+            # 檢測退出
+            if break_check:
+                break
+            
+            # 檢查用
+            # ct += 1
+            # cv2.imwrite(f"out-{filename}.png", clone)
+            ###
+        
+        # 讀取座號
+        # 計算匹配值 
+        position_points_number = sorted(match_template(use_image_preprocess, number_template_preprocess, CONFIG), key=lambda x: x[1])
+        
+        # 計算座號
+        # 檢查用
+        # clone = use_image.copy()
+        ###
+        seat_number = ["", ""]
+        if len(position_points_number) == 3:
+            interval_height = abs(position_points_number[1][1]-position_points_number[0][1])
+            for posnum in range(1, 3):
+                position = position_points_number[posnum]
+                pos_y = position[1]
+                for num in range(10):
+                    pos_x = position[0] - position[0]/13*(num+1) - position[0]*0.0015*(num) - position[0]*0.003*num/3
+                    
+                    # 檢查用
+                    # cv2.rectangle(clone, (int(pos_x-0.16*CONFIG["find_table"]["crop_ratio_mult"]), int(pos_y-0.22*CONFIG["find_table"]["crop_ratio_mult"])), (int(pos_x+0.16*CONFIG["find_table"]["crop_ratio_mult"]), int(pos_y+0.16*CONFIG["find_table"]["crop_ratio_mult"])), (0, 0, 255), 3)
+                    # cv2.imwrite(f"out.png", clone)
+                    ###
+                    # 取得座號
+                    get_number_img = use_image_blank[int(pos_y-0.17*CONFIG["find_table"]["crop_ratio_mult"]):int(pos_y+0.17*CONFIG["find_table"]["crop_ratio_mult"]), int(pos_x-0.17*CONFIG["find_table"]["crop_ratio_mult"]):int(pos_x+0.14*CONFIG["find_table"]["crop_ratio_mult"])]
+                    # 將座號放大
+                    number_img_dilated = cv2.dilate(get_number_img, None, iterations=CONFIG["find_table"]["option_detect_expansion_degree"])
+                    # 計算像素點數量
+                    total_pixels = number_img_dilated.size
+                    # 計算白色像素點數量
+                    white_pixels = np.sum(number_img_dilated > 200)
+                    # 計算比率
+                    white_pixel_ratio = white_pixels/total_pixels*100
+                    # if white_pixel_ratio > CONFIG["find_table"]["option_detect_domain_value"]:
+                    #     seat_number[posnum] += str(9-num)
+                    #     break
+            # 格式化座號
+            image_number = format_number("".join(seat_number))
+        else:
+            # 無座號直接使用檔案名稱
+            image_number = format_number(filename)
+        
+        # 紀錄時間
+        write_csv(f'{safe_filename(CONFIG["read_write_log"]["log_file_name"])}', f">>現在時間", datetime.strftime(datetime.now(), "%Y年%m月%d日%H點%M分%S秒"))
+        
+        # 如果是答案就存起來
+        if check_is_ans_file: 
+            have_ans = all_ans_out.copy()
+            save_data = [CONFIG["img"]["ans_file_name"], all_ans_out, 100]
+            # everyone_data[CONFIG["img"]["ans_file_name"]] = [0, all_ans_out, CONFIG["score_setting"]["number_of_questions"], 100]
+            write_csv(f'{safe_filename(CONFIG["read_write_log"]["log_file_name"])}', filename, save_data)
+            print(f"已找到答案檔案 {filename} 並用於評分")
+            continue
+
+        
+        # 確認是否有答案
+        if len(have_ans) <= 0:
+            # 儲存答案
+            save_data = [image_number, all_ans_out, -1]
+            finish_check, finish_number =check_dict(everyone_data, image_number)
+            everyone_data[finish_number] = [int(image_number) if image_number.isdigit() else image_number, all_ans_out, -1, -1]
+            write_csv(f'{safe_filename(CONFIG["read_write_log"]["log_file_name"])}', filename, save_data)
+        # 有答案
+        else:
+            # have_ans all_ans_out
+            # 計算分數
+            score_count = 0
+            one_question_score = CONFIG["score_setting"]["total_score"]/CONFIG["score_setting"]["number_of_questions"]
+            for column in range(len(all_ans_out)):
+                for row in range(CONFIG["find_table"]["number_of_rows"]):
+                    if (column*CONFIG["find_table"]["number_of_rows"]+row) >= CONFIG["score_setting"]["number_of_questions"]:break
+                    if have_ans[column][row] == all_ans_out[column][row]:
+                        score_count += 1
+                        all_ans_out[column][row] = "-"
+                    else:
+                        question_error_count[column*CONFIG["find_table"]["number_of_rows"]+row] += 1
+            score = math.ceil(score_count * one_question_score)
+            # 儲存答案
+            save_data = [image_number, all_ans_out, score]
+            finish_check, finish_number = check_dict(everyone_data, image_number)
+            everyone_data[finish_number] = [int(image_number) if image_number.isdigit() else image_number, all_ans_out, score_count, score]
+            write_csv(f'{safe_filename(CONFIG["read_write_log"]["log_file_name"])}', filename, save_data)
+        continue
+
+    # 將結果匯出成表格
+    # 設定說明文字
+    explanation_text = [
+        "符號說明,答案正確:-,答案錯誤:呈現學生答案,未作答:=",
+        "複選時代碼對照,A:A,B:B,C:C",
+        "D:D,F:AB,G:AC,H:AD",
+        "J:BC,K:BD,M:CD,P:ABC",
+        "Q:ABD,S:ACD,V:BCD,Z:ABCD"
+    ]
+    explanation_count = 2
+    with open(f'{safe_filename_export(CONFIG["img"]["folder_path"])}', "w", encoding="utf-8-sig") as csvfile:
+        # 寫入正確答案 如沒有填入空白
+        if len(have_ans) <= 0:
+            csvfile.write("\\     ,"+f'標準答案  ,{"  ,"*CONFIG["score_setting"]["number_of_questions"]}答對題數,得分  ')
+        else:
+            csvfile.write("\\     ,"+f'標準答案  ,')
+            for column in have_ans:
+                for row in column:
+                    csvfile.write(f" {convert_alphabet(row)},")
+            csvfile.write(f'答對題數,得分  ')
+        # 第一行說明
+        csvfile.write(f",{explanation_text[0]}\n")
+        # 寫入題號
+        csvfile.write("座號  ,題號      ,",)
+        for num in range(CONFIG["score_setting"]["number_of_questions"]):
+            csvfile.write(f"{str(num+1).zfill(2)},")
+        # 第二行說明
+        csvfile.write(f'{" "*8},{" "*6},{explanation_text[1]}\n')
+        # 寫入學生答案
+        total_score = []
+        for number in sorted(everyone_data.items(), key=lambda x: (x[0])):
+            csvfile.write(f'{number[0]:4s}號,學生答案  ,')
+            for column in number[1][1]:
+                for row in column:
+                    csvfile.write(f" {convert_alphabet(row)},")
+            csvfile.write(f'{str(number[1][2]):8s},{str(number[1][3]):6s}')
+            # 寫入後續說明
+            if explanation_count < len(explanation_text):
+                csvfile.write(f',{explanation_text[explanation_count]}\n')
+                explanation_count += 1
+            else:
+                csvfile.write('\n')
+            total_score.append(number[1][3])
+        # 補足說明部分
+        while explanation_count < len(explanation_text):
+            csvfile.write(f'{" "*6},{" "*10},{"  ,"*CONFIG["score_setting"]["number_of_questions"]}{" "*8},{" "*6},{explanation_text[explanation_count]}\n')
+            explanation_count += 1
+        csvfile.write(f'\\     ,答錯人數  ,')
+        for count in question_error_count:
+            csvfile.write(f'{str(count).zfill(2)},')
+        # 寫入平均
+        total_score = [score for score in total_score if score != -1]
+        if len(have_ans) <= 0: total_score = [0]
+        csvfile.write(f'平均    ,{sum(total_score)/len(total_score):<6.1f}\n')
+        # 最高分
+        csvfile.write(f'{" "*6},{" "*10},{"  ,"*CONFIG["score_setting"]["number_of_questions"]}最高分  ,{max(total_score):<6d}\n')
+        # 最低分
+        csvfile.write(f'{" "*6},{" "*10},{"  ,"*CONFIG["score_setting"]["number_of_questions"]}最低分  ,{min(total_score):<6d}\n')
+
+
+# 頁面用函數
+def run_script(pdf_file, number_of_questions, total_score):
+    # 檢查檔案
+    if not pdf_file: return "請上傳檔案"
+    if pdf_file.name.split(".")[-1].lower() != "pdf": return "請上傳PDF檔案"
+
+    # 建立資料夾
+    work_folder = os.path.join(CONFIG["img"]["pdf_to_img_folder"], datetime.now().strftime("%Y%m%d%H%M%S"))
+    os.makedirs(work_folder, exist_ok=True)
+    # pdf轉圖片
+    pdf_doc = Document(pdf_file)
+    for dct in range(len(pdf_doc)):
+        for img in pdf_doc.get_page_images(dct):
+            xref = img[0]
+            pix = Pixmap(pdf_doc, xref)
+            pix.save(os.path.join(work_folder, f'img_{dct}.png'))
+
+    return f"{pdf_file.name}"
+
+# 建立介面
+iface = gr.Interface(
+    fn=run_script,
+    inputs=[
+        gr.File(label="上傳檔案", file_types=["pdf"]),
+        gr.Slider(minimum=1, maximum=50, label="題目數量", step=1),
+        gr.Slider(minimum=1, maximum=100, label="總分", step=5)
+    ],
+    outputs=[
+        "text"
+    ],
+    title="視覺化讀卡工具",
+    description="上傳掃描過後的答案卡來自動評分",
+    submit_btn = "一鍵執行"
+)
+
+# 執行程式
+if __name__ == "__main__":
+    if CONFIG["img"]["interface"]:
+        iface.launch(inbrowser=True) # 自動於瀏覽器中開啟
+    else:
+        main_function()
+
+

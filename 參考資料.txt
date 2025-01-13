@@ -31,6 +31,9 @@ https://stackoverflow.com/questions/60521925/how-to-detect-the-horizontal-and-ve
 去除背景噪點
 https://steam.oxxostudio.tw/category/python/ai/opencv-blur.html
 
+pdf轉圖片
+https://stackoverflow.com/questions/2693820/extract-images-from-pdf-without-resampling-in-python/34116472#34116472
+
 網頁製作
 https://github.com/gradio-app/gradio
 
