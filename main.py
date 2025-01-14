@@ -9,8 +9,8 @@ import ast
 import time
 from datetime import datetime
 import gradio as gr
-from fitz import Document, Pixmap
-
+from pypdf import PdfReader
+# from fitz import Document, Pixmap
 
 
 # 計算兩點距離
@@ -27,7 +27,9 @@ def read_image_file(filename):
 
 def log_safe_filename(name:str):
     out = name.replace("\\", "/").strip("/").replace(".log", "")
-    return f'{out}.log'
+    log_time = datetime.now().strftime("%Y-%m-%d")
+    out_path = out.replace("%name%", log_time)
+    return f'{out_path}.log'
 
 ## 記錄檔使用
 # 讀取記錄檔
@@ -62,7 +64,7 @@ def write_csv(filename, keyname, value):
 
 # 影像預處理
 def preprocess_image(image):
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) # 灰階
+    gray = image if len(image.shape) == 2 else cv2.cvtColor(image, cv2.COLOR_BGR2GRAY) # 灰階
     # 高斯模糊
     blurred_image = cv2.GaussianBlur(gray, (11, 11), 0)
     # 使用二值化
@@ -117,10 +119,11 @@ def format_number(number):
 def check_dict(data, key):
     if key not in data: return False, key
     count = 1
-    while key in data:
-        key = f"{key}_{count}"
+    temp_key = key
+    while temp_key in data:
+        temp_key = f"{key}_{count}"
         count += 1
-    return True, key
+    return True, temp_key
 
 # 轉換為字母
 def convert_alphabet(data):
@@ -197,6 +200,7 @@ if not os.path.exists(folder_path):
 
 # 主程式
 def main_function():
+    global CONFIG
     # 確保有答案
     have_ans = []
     # 記錄每題答錯人數
@@ -310,7 +314,7 @@ def main_function():
         # 將原有答案卡部分清除 只保留劃記痕跡
         # use_image_blank = cv2.subtract(use_image_preprocess, minus_blank_preprocess) 
         # 影像預處理(相對於常用的預處理不太一樣 )
-        use_img_gray = cv2.cvtColor(use_image, cv2.COLOR_BGR2GRAY)
+        use_img_gray = use_image if len(use_image.shape) == 2 else cv2.cvtColor(use_image, cv2.COLOR_BGR2GRAY)
         use_img_blur = cv2.GaussianBlur(use_img_gray, (3,3), 0)
         use_img_thresh = cv2.threshold(use_img_blur, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)[1]
         # 檢測水平線
@@ -324,7 +328,7 @@ def main_function():
         # 將答案卡中線條清除
         use_image_blank = cv2.cvtColor(use_image_preprocess, cv2.COLOR_GRAY2BGR)
         use_image_blank[np.where(table_mask==255)] = [0,0,0] 
-        
+        use_image_blank = use_image_preprocess
         # 取得答案
         # 計算匹配值
         position_points = match_template(use_image_preprocess, template_preprocess, CONFIG)
@@ -406,12 +410,15 @@ def main_function():
                 for num in range(10):
                     pos_x = position[0] - position[0]/13*(num+1) - position[0]*0.0015*(num) - position[0]*0.003*num/3
                     
+                    # 取得座號
+                    get_number_img = use_image_blank[int(pos_y-0.22*CONFIG["find_table"]["crop_ratio_mult"]):int(pos_y+0.16*CONFIG["find_table"]["crop_ratio_mult"]), int(pos_x-0.16*CONFIG["find_table"]["crop_ratio_mult"]):int(pos_x+0.16*CONFIG["find_table"]["crop_ratio_mult"])]
+                    
                     # 檢查用
                     # cv2.rectangle(clone, (int(pos_x-0.16*CONFIG["find_table"]["crop_ratio_mult"]), int(pos_y-0.22*CONFIG["find_table"]["crop_ratio_mult"])), (int(pos_x+0.16*CONFIG["find_table"]["crop_ratio_mult"]), int(pos_y+0.16*CONFIG["find_table"]["crop_ratio_mult"])), (0, 0, 255), 3)
                     # cv2.imwrite(f"out.png", clone)
+                    # cv2.imwrite(f"out.png", get_number_img)
                     ###
-                    # 取得座號
-                    get_number_img = use_image_blank[int(pos_y-0.17*CONFIG["find_table"]["crop_ratio_mult"]):int(pos_y+0.17*CONFIG["find_table"]["crop_ratio_mult"]), int(pos_x-0.17*CONFIG["find_table"]["crop_ratio_mult"]):int(pos_x+0.14*CONFIG["find_table"]["crop_ratio_mult"])]
+
                     # 將座號放大
                     number_img_dilated = cv2.dilate(get_number_img, None, iterations=CONFIG["find_table"]["option_detect_expansion_degree"])
                     # 計算像素點數量
@@ -420,9 +427,9 @@ def main_function():
                     white_pixels = np.sum(number_img_dilated > 200)
                     # 計算比率
                     white_pixel_ratio = white_pixels/total_pixels*100
-                    # if white_pixel_ratio > CONFIG["find_table"]["option_detect_domain_value"]:
-                    #     seat_number[posnum] += str(9-num)
-                    #     break
+                    if white_pixel_ratio > CONFIG["find_table"]["option_detect_domain_value"]:
+                        seat_number[posnum-1] += str(9-num)
+                        break
             # 格式化座號
             image_number = format_number("".join(seat_number))
         else:
@@ -445,8 +452,8 @@ def main_function():
         # 確認是否有答案
         if len(have_ans) <= 0:
             # 儲存答案
-            save_data = [image_number, all_ans_out, -1]
-            finish_check, finish_number =check_dict(everyone_data, image_number)
+            finish_check, finish_number = check_dict(everyone_data, image_number)
+            save_data = [finish_number, all_ans_out, -1]
             everyone_data[finish_number] = [int(image_number) if image_number.isdigit() else image_number, all_ans_out, -1, -1]
             write_csv(f'{safe_filename(CONFIG["read_write_log"]["log_file_name"])}', filename, save_data)
         # 有答案
@@ -465,8 +472,8 @@ def main_function():
                         question_error_count[column*CONFIG["find_table"]["number_of_rows"]+row] += 1
             score = math.ceil(score_count * one_question_score)
             # 儲存答案
-            save_data = [image_number, all_ans_out, score]
             finish_check, finish_number = check_dict(everyone_data, image_number)
+            save_data = [finish_number, all_ans_out, score]
             everyone_data[finish_number] = [int(image_number) if image_number.isdigit() else image_number, all_ans_out, score_count, score]
             write_csv(f'{safe_filename(CONFIG["read_write_log"]["log_file_name"])}', filename, save_data)
         continue
@@ -533,20 +540,26 @@ def main_function():
 
 # 頁面用函數
 def run_script(pdf_file, number_of_questions, total_score):
+    global CONFIG
     # 檢查檔案
-    if not pdf_file: return "請上傳檔案"
-    if pdf_file.name.split(".")[-1].lower() != "pdf": return "請上傳PDF檔案"
+    if not pdf_file: raise gr.Error("請上傳檔案", title="錯誤")
 
     # 建立資料夾
     work_folder = os.path.join(CONFIG["img"]["pdf_to_img_folder"], datetime.now().strftime("%Y%m%d%H%M%S"))
     os.makedirs(work_folder, exist_ok=True)
-    # pdf轉圖片
-    pdf_doc = Document(pdf_file)
-    for dct in range(len(pdf_doc)):
-        for img in pdf_doc.get_page_images(dct):
-            xref = img[0]
-            pix = Pixmap(pdf_doc, xref)
-            pix.save(os.path.join(work_folder, f'img_{dct}.png'))
+    # 轉換資料夾
+    # pdf_doc = Document(pdf_file)
+    # for dct in range(len(pdf_doc)):
+    #     for img in pdf_doc.get_page_images(dct):
+    #         xref = img[0]
+    #         pix = Pixmap(pdf_doc, xref)
+    #         pix.save(os.path.join(work_folder, f'img_{dct}.png'))
+    pdf_doc = PdfReader(pdf_file.name)
+    for pdf_page in pdf_doc.pages:
+        for pdf_image in pdf_page.images:
+            with open(os.path.join(work_folder, pdf_image.name), "wb") as pdf_path:
+                pdf_path.write(pdf_image.data)
+    # 
 
     return f"{pdf_file.name}"
 
@@ -554,7 +567,7 @@ def run_script(pdf_file, number_of_questions, total_score):
 iface = gr.Interface(
     fn=run_script,
     inputs=[
-        gr.File(label="上傳檔案", file_types=["pdf"]),
+        gr.File(label="上傳檔案", file_types=[".pdf"]),
         gr.Slider(minimum=1, maximum=50, label="題目數量", step=1),
         gr.Slider(minimum=1, maximum=100, label="總分", step=5)
     ],

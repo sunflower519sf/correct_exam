@@ -3,5 +3,4 @@ opencv-python
 PyYAML == 6.0
 imutils == 0.5.4
 gradio
-fitz
-PyMuPDF
+pypdf

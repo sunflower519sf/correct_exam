@@ -21,7 +21,7 @@ find_table:
   preprocessing_dualization: 220 # 設定在二質化時需要多大的強度(二質化會將圖片轉為黑白) 預設為220 0表示純黑 255表示純白 建議可以稍微偏白 檢測出來的消果比較好
   auto_perspective: !!bool true # 設定是否在裁減圖片時自動進行透視變換 用作於圖片有傾斜時使用 預設為false 
   crop_ratio_mult: 100 # 設定裁切時圖片大小的倍數 如果設定過大會造成使用過多資源 但成功率更高 過低容易出錯或是檢測不到內容 預設為100
-  position_image_domain_value: 0.6 # 設定定位圖片時可接受的域值 過大可能導致定位失敗 過小可以定位錯誤 預設為0.6
+  position_image_domain_value: 0.7 # 設定定位圖片時可接受的域值 過大可能導致定位失敗 過小可以定位錯誤 預設為0.6
   number_of_answers: 4  # 設定每題答案數量 正常為A, B, C, D 共4個 預設為4
   number_of_rows: 10  # 設定每一排(從上往下)的數量 預設為10
   option_detect_expansion_degree: 20  # 設定檢測選項時的放大程度 用於在學生作答選擇該選項時將所選擇內容擴大增加檢測成功率 預設為20
@@ -29,6 +29,6 @@ find_table:
   
 
 read_write_log: 
-  log_file_name: src/log/ans.log  # 設定存放log檔案名稱 預設為ans.log
+  log_file_name: src/log/%name%.log  # 設定存放log檔案名稱 預設為ans.log
   data_delimiter: !!str "|"  # 設定csv資料分隔符號 預設為|
 
