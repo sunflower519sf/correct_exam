@@ -1,66 +1,46 @@
 @echo off
+setlocal
 
-:: Keep the CMD window open for debugging
-setlocal enabledelayedexpansion
-
-:: Check if Python is installed and its version
-python --version 2>nul | findstr "Python 3\.11\.[7-9]" >nul
-if %errorlevel% neq 0 (
-    echo Python 3.11.7 or higher is not detected. Installing Python...
-
-    :: Install Python in windowed mode to display progress bar
-    set "PYTHON_INSTALLER=python-3.11.7-amd64.exe"
-    if exist "%PYTHON_INSTALLER%" (
-        echo Launching Python installer...
-        start /wait "" "%PYTHON_INSTALLER%" InstallAllUsers=1 PrependPath=1 Include_test=0
-
-        if %errorlevel% neq 0 (
-            echo Python installation failed.
-            pause
-            exit /b 1
-        )
-    ) else (
-        echo Error: Python installer "%PYTHON_INSTALLER%" not found.
-        pause
-        exit /b 1
-    )
-)
-
-:: Check if Python is in the PATH
-set "PYTHON_PATH_CHECK=%ProgramFiles%\Python311\python.exe"
-if exist "%PYTHON_PATH_CHECK%" (
-    for %%I in ("%PYTHON_PATH_CHECK%") do set "PYTHON_DIR=%%~dpI"
-    set "PATH=!PYTHON_DIR!;%PATH%"
-    setx PATH "!PYTHON_DIR!;%PATH%" >nul
-) else (
-    echo Error: Python executable not found in expected path.
-    pause
-    exit /b 1
-)
-
-:: Confirm Python is accessible
+REM Check if Python is installed and in PATH
 python --version >nul 2>&1
 if %errorlevel% neq 0 (
-    echo Error: Python is not accessible after installation.
-    pause
-    exit /b 1
+    echo Python is not installed or not in PATH.
+    goto install_python
 )
 
-:: Install required Python packages
-if exist "requirements.txt" (
-    echo Installing required Python packages...
-    pip install -r requirements.txt
-    if %errorlevel% neq 0 (
-        echo Error: Failed to install required Python packages.
-        pause
-        exit /b 1
-    )
-) else (
-    echo Error: requirements.txt not found.
-    pause
-    exit /b 1
+REM Check Python version
+for /f "tokens=2 delims= " %%i in ('python --version') do set PY_VERSION=%%i
+for /f "tokens=1,2,3 delims=." %%a in ("%PY_VERSION%") do (
+    set MAJOR=%%a
+    set MINOR=%%b
+    set PATCH=%%c
 )
 
-echo Setup complete.
+if %MAJOR% lss 3 goto install_python
+if %MAJOR%==3 if %MINOR% lss 11 goto install_python
+if %MAJOR%==3 if %MINOR%==11 if %PATCH% lss 7 goto install_python
+
+echo Python version %PY_VERSION% is sufficient.
+goto install_requirements
+
+:install_python
+echo Installing Python...
+REM Add your Python installation logic here (e.g., call an installer or guide the user).
+goto end
+
+:install_requirements
+echo Installing required Python packages...
+pip install -r requirements.txt
+if %errorlevel% neq 0 (
+    echo Failed to install required packages.
+    goto end
+)
+
+echo All requirements installed successfully.
+
+goto end
+
+:end
+echo Script completed.
+endlocal
 pause
-exit /b 0
