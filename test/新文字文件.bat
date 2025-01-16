@@ -1,17 +1,17 @@
 @echo off
 
 :: Check if Python is installed and its version
-python --version 2>nul | findstr /r "Python 3\.1[1-9]\.[7-9]" >nul
+python --version 2>nul | findstr "Python 3\.11\.[7-9]" >nul
 if %errorlevel% neq 0 (
     echo Python 3.11.7 or higher is not detected. Installing Python...
 
     :: Install Python silently with progress bar
     set "PYTHON_INSTALLER=python-3.11.7-amd64.exe"
-    if not exist %PYTHON_INSTALLER% (
+    if not exist "%PYTHON_INSTALLER%" (
         echo Error: Python installer (%PYTHON_INSTALLER%) not found.
         exit /b 1
     )
-    %PYTHON_INSTALLER% /quiet InstallAllUsers=1 PrependPath=1 Include_test=0
+    "%PYTHON_INSTALLER%" /quiet InstallAllUsers=1 PrependPath=1 Include_test=0
 
     if %errorlevel% neq 0 (
         echo Python installation failed.
@@ -40,6 +40,10 @@ if %errorlevel% neq 0 (
 
 :: Install required Python packages
 echo Installing required Python packages...
+if not exist "requirements.txt" (
+    echo Error: requirements.txt not found.
+    exit /b 1
+)
 pip install -r requirements.txt
 
 if %errorlevel% neq 0 (
