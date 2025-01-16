@@ -1,41 +1,51 @@
 @echo off
-setlocal
 
-:: 設定 Python 安裝文件名稱（假設安裝文件是 python-installer.exe）
-set INSTALLER=python-installer.exe
-
-:: 檢查 Python 是否已安裝並檢查版本
-python --version >nul 2>&1
+:: Check if Python is installed and its version
+python --version 2>nul | findstr /r "Python 3\.1[1-9]\.[7-9]" >nul
 if %errorlevel% neq 0 (
-    echo Python 未安裝，請安裝 Python。
-    call :ask_user_to_install
-    goto end
+    echo Python 3.11.7 or higher is not detected. Installing Python...
+
+    :: Install Python silently with progress bar
+    set "PYTHON_INSTALLER=python-3.11.7-amd64.exe"
+    if not exist %PYTHON_INSTALLER% (
+        echo Error: Python installer (%PYTHON_INSTALLER%) not found.
+        exit /b 1
+    )
+    %PYTHON_INSTALLER% /quiet InstallAllUsers=1 PrependPath=1 Include_test=0
+
+    if %errorlevel% neq 0 (
+        echo Python installation failed.
+        exit /b 1
+    )
 )
 
-:: 取得當前的 Python 版本
-for /f "delims=" %%i in ('python --version 2^>nul') do set PYTHON_VERSION=%%i
-
-:: 提取版本號 (假設格式為 Python 3.11.0)
-for /f "tokens=2 delims= " %%i in ("%PYTHON_VERSION%") do set VERSION=%%i
-for /f "tokens=1,2,3 delims=." %%i in ("%VERSION%") do (
-    set MAJOR=%%i
-    set MINOR=%%j
-    set PATCH=%%k
+:: Ensure Python is in the PATH
+set "PYTHON_PATH_CHECK=%ProgramFiles%\Python311\python.exe"
+if not exist "%PYTHON_PATH_CHECK%" (
+    echo Error: Python installation path not found.
+    exit /b 1
 )
 
-:: 檢查版本是否大於等於 3.11.7
-if %MAJOR% LSS 3 (
-    echo 當前版本為 %VERSION%，低於要求的 3.11.7，正在安裝符合要求的版本...
-    call :ask_user_to_install
-    goto end
+for %%I in ("%PYTHON_PATH_CHECK%") do set "PYTHON_DIR=%%~dpI"
+
+set "PATH=%PYTHON_DIR%;%PATH%"
+setx PATH "%PYTHON_DIR%;%PATH%" >nul
+
+:: Confirm Python is accessible
+python --version 2>nul
+if %errorlevel% neq 0 (
+    echo Error: Python is not accessible after installation.
+    exit /b 1
 )
 
-if %MAJOR% LSS 3 (
-    echo 當前版本為 %VERSION%，但仍未滿足要求，正在安裝符合要求的版本...
-    call :ask_user_to_install
-    goto end
+:: Install required Python packages
+echo Installing required Python packages...
+pip install -r requirements.txt
+
+if %errorlevel% neq 0 (
+    echo Error: Failed to install required Python packages.
+    exit /b 1
 )
 
-if %MAJOR% LSS 3 (
-    echo 當前版本為 %VERSION%，但仍未滿足要求，正在安裝符合要求的版本..
- 
+echo Setup complete.
+exit /b 0
