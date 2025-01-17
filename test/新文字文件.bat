@@ -1,14 +1,13 @@
 @echo off
-chcp 65001
 
 REM 檢查是否有 Python
 python --version >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     echo Python 未安裝，正在安裝...
     REM 假設目錄中有 Python 安裝檔案，名稱為 python-installer.exe
-    python-installer.exe /passive InstallAllUsers=1 PrependPath=1 /log install.log
+    python-installer.exe /passive InstallAllUsers=1 PrependPath=1
     if %ERRORLEVEL% NEQ 0 (
-        echo Python 安裝失敗，請檢查日誌文件 install.log。
+        echo Python 安裝失敗，請檢查安裝檔案。
         pause
         exit /b
     )
@@ -33,9 +32,9 @@ goto CheckPath
 
 :InstallPython
     echo Python 版本過低，正在重新安裝...
-    python-installer.exe /passive InstallAllUsers=1 PrependPath=1 /log install.log
+    python-installer.exe /passive InstallAllUsers=1 PrependPath=1
     if %ERRORLEVEL% NEQ 0 (
-        echo Python 安裝失敗，請檢查日誌文件 install.log。
+        echo Python 安裝失敗，請檢查安裝檔案。
         pause
         exit /b
     )
@@ -46,9 +45,9 @@ REM 檢查 Python 是否在環境變量中
 python --version >nul 2>&1
 if %ERRORLEVEL% NEQ 0 (
     echo Python 未在環境變量中，正在嘗試修復...
-    python-installer.exe /passive InstallAllUsers=1 PrependPath=1 /log install.log
+    python-installer.exe /passive InstallAllUsers=1 PrependPath=1
     if %ERRORLEVEL% NEQ 0 (
-        echo 修復失敗，請檢查日誌文件 install.log。
+        echo 修復失敗，請檢查安裝檔案。
         pause
         exit /b
     )
@@ -71,5 +70,3 @@ if %ERRORLEVEL% NEQ 0 (
 
 REM 執行主程式
 python main.py
-
-pause
