@@ -1,46 +1,55 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
+chcp 65001
 
-REM Check if Python is installed and in PATH
-python --version >nul 2>&1
+REM 確保 Python 可執行檔在 PATH 中
+where python >nul 2>nul
 if %errorlevel% neq 0 (
-    echo Python is not installed or not in PATH.
-    goto install_python
+    echo Python 未安裝或未加入 PATH 環境變數。
+    pause
+    exit /b 1
 )
 
-REM Check Python version
-for /f "tokens=2 delims= " %%i in ('python --version') do set PY_VERSION=%%i
-for /f "tokens=1,2,3 delims=." %%a in ("%PY_VERSION%") do (
-    set MAJOR=%%a
-    set MINOR=%%b
-    set PATCH=%%c
-)
-
-if %MAJOR% lss 3 goto install_python
-if %MAJOR%==3 if %MINOR% lss 11 goto install_python
-if %MAJOR%==3 if %MINOR%==11 if %PATCH% lss 7 goto install_python
-
-echo Python version %PY_VERSION% is sufficient.
-goto install_requirements
-
-:install_python
-echo Installing Python...
-REM Add your Python installation logic here (e.g., call an installer or guide the user).
-goto end
-
-:install_requirements
-echo Installing required Python packages...
-pip install -r requirements.txt
+REM 確保 pip 可執行檔可用
+python -m pip --version >nul 2>nul
 if %errorlevel% neq 0 (
-    echo Failed to install required packages.
-    goto end
+    echo pip 未正確安裝。請檢查您的 Python 安裝。
+    pause
+    exit /b 1
 )
 
-echo All requirements installed successfully.
+REM 升級 pip
+echo 正在升級 pip...
+python -m pip install --upgrade pip
+if %errorlevel% neq 0 (
+    echo pip 升級失敗！
+    pause
+    exit /b 1
+)
 
-goto end
+REM 安裝需求
+if exist requirements.txt (
+    echo 正在安裝需求模組...
+    python -m pip install -r requirements.txt
+    if %errorlevel% neq 0 (
+        echo 模組安裝失敗！
+        pause
+        exit /b 1
+    )
+) else (
+    echo 未找到 requirements.txt 文件！
+    pause
+    exit /b 1
+)
 
-:end
-echo Script completed.
+REM 執行主程式
+echo 啟動主程式...
+python main.py
+if %errorlevel% neq 0 (
+    echo 主程式執行失敗！
+    pause
+    exit /b 1
+)
+
 endlocal
 pause
