@@ -1,55 +1,72 @@
 @echo off
-setlocal enabledelayedexpansion
-chcp 65001
 
-REM 確保 Python 可執行檔在 PATH 中
-where python >nul 2>nul
-if %errorlevel% neq 0 (
-    echo Python 未安裝或未加入 PATH 環境變數。
-    pause
-    exit /b 1
-)
-
-REM 確保 pip 可執行檔可用
-python -m pip --version >nul 2>nul
-if %errorlevel% neq 0 (
-    echo pip 未正確安裝。請檢查您的 Python 安裝。
-    pause
-    exit /b 1
-)
-
-REM 升級 pip
-echo 正在升級 pip...
-python -m pip install --upgrade pip
-if %errorlevel% neq 0 (
-    echo pip 升級失敗！
-    pause
-    exit /b 1
-)
-
-REM 安裝需求
-if exist requirements.txt (
-    echo 正在安裝需求模組...
-    python -m pip install -r requirements.txt
-    if %errorlevel% neq 0 (
-        echo 模組安裝失敗！
+REM 檢查是否有 Python
+python --version >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    echo Python 未安裝，正在安裝...
+    REM 假設目錄中有 Python 安裝檔案，名稱為 python-installer.exe
+    python-installer.exe /quiet InstallAllUsers=1 PrependPath=1
+    if %ERRORLEVEL% NEQ 0 (
+        echo Python 安裝失敗，請檢查安裝檔案。
         pause
-        exit /b 1
+        exit /b
     )
-) else (
-    echo 未找到 requirements.txt 文件！
+)
+
+REM 獲取 Python 版本
+for /f "tokens=2 delims= " %%a in ('python --version') do set PYTHON_VERSION=%%a
+
+REM 提取主版本、副版本和修訂號
+for /f "tokens=1-3 delims=." %%a in ("%PYTHON_VERSION%") do (
+    set MAJOR=%%a
+    set MINOR=%%b
+    set PATCH=%%c
+)
+
+REM 檢查版本是否大於 3.11.7
+if %MAJOR% LSS 3 goto InstallPython
+if %MAJOR%==3 if %MINOR% LSS 11 goto InstallPython
+if %MAJOR%==3 if %MINOR%==11 if %PATCH% LSS 7 goto InstallPython
+
+goto CheckPath
+
+:InstallPython
+    echo Python 版本過低，正在重新安裝...
+    python-installer.exe /quiet InstallAllUsers=1 PrependPath=1
+    if %ERRORLEVEL% NEQ 0 (
+        echo Python 安裝失敗，請檢查安裝檔案。
+        pause
+        exit /b
+    )
+    goto CheckPath
+
+:CheckPath
+REM 檢查 Python 是否在環境變量中
+python --version >nul 2>&1
+if %ERRORLEVEL% NEQ 0 (
+    echo Python 未在環境變量中，正在嘗試修復...
+    python-installer.exe /quiet InstallAllUsers=1 PrependPath=1
+    if %ERRORLEVEL% NEQ 0 (
+        echo 修復失敗，請檢查安裝檔案。
+        pause
+        exit /b
+    )
+)
+
+REM 升級 pip 並安裝必要的依賴
+python.exe -m pip install --upgrade pip
+if %ERRORLEVEL% NEQ 0 (
+    echo pip 升級失敗，請檢查網路連線。
     pause
-    exit /b 1
+    exit /b
+)
+
+pip install -r requirements.txt
+if %ERRORLEVEL% NEQ 0 (
+    echo 依賴安裝失敗，請檢查 requirements.txt 文件。
+    pause
+    exit /b
 )
 
 REM 執行主程式
-echo 啟動主程式...
 python main.py
-if %errorlevel% neq 0 (
-    echo 主程式執行失敗！
-    pause
-    exit /b 1
-)
-
-endlocal
-pause
