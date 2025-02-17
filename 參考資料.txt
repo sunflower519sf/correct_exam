@@ -1,6 +1,3 @@
-ocr 模型參考
-https://github.com/sml2h3/ddddocr
-
 讀取資料夾下所有檔案
 https://medium.com/ai%E5%8F%8D%E6%96%97%E5%9F%8E/python-%E6%9F%A5%E8%A9%A2%E8%B3%87%E6%96%99%E5%A4%BE%E4%B8%8B%E7%9A%84%E6%89%80%E6%9C%89%E6%AA%94%E6%A1%88%E5%90%8D%E7%A8%B1-45c6ec75c430
 
@@ -40,5 +37,5 @@ https://github.com/gradio-app/gradio
 網頁展示頁面製作
 https://www.gradio.app/docs
 
-開啟文件夾
-https://github.com/gradio-app/gradio/issues/2515
+頁面標題
+https://github.com/gradio-app/gradio/issues/385

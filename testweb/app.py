@@ -42,7 +42,8 @@ iface = gr.Interface(
     inputs=[
         gr.File(label="上傳檔案", file_types=[".pdf"]),
         gr.Slider(minimum=1, maximum=50, label="題目數量", step=1),
-        gr.Slider(minimum=1, maximum=100, label="總分", step=5)
+        gr.Slider(minimum=1, maximum=100, label="總分", step=5),
+        gr.File(label="上傳上傳答案檔")
     ],
     outputs=[
         "text"

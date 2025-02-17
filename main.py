@@ -9,6 +9,7 @@ import ast
 import time
 from datetime import datetime
 import gradio as gr
+import hashlib
 from pypdf import PdfReader
 # from fitz import Document, Pixmap
 
@@ -20,6 +21,21 @@ def calculate_the_distance_between_2_points(points1, points2):
 # 計算兩點中點座標
 def calculate_the_center_point_of_2_points(points):
     return [(points[0] + points[2])/2, (points[1] + points[3])/2]
+
+# 回傳錯誤訊息
+def error_message(message, check_error=""):
+    global CONFIG
+    if CONFIG["img"]["interface"]:
+        if check_error == "error":
+            raise gr.Error("請上傳檔案", title="錯誤")
+        elif check_error == "warning":
+            gr.Warning(message, title="警告")
+        else:
+            gr.Info(message, title="提示")
+        
+    else:
+        print(f"ERROR: {message}")
+    return
 
 # 讀取圖片檔案
 def read_image_file(filename):
@@ -169,7 +185,10 @@ def get_ans_file(all_img_file:list, CONFIG):
             all_img_file.remove(file_name)
             return [f"{file_name}/ansfile?.ansfile?"] + all_img_file
         else:
-            return ["nofile?.ansfile?"] + all_img_file
+            if CONFIG["img"]["interface"]:
+                return [f"{file_name}/ansfile?.ansfile?"] + all_img_file
+            else:
+                return ["nofile?.ansfile?"] + all_img_file
     else:
         for file_extension in safe_text(CONFIG["img"]["format"]):
             file_name = f"{file_name}.{file_extension}" 
@@ -192,15 +211,16 @@ template = read_image_file(safe_filename(f'{CONFIG["img"]["contrast_folder"]}/{C
 # 載入座號定位圖片
 number_template = read_image_file(safe_filename(f'{CONFIG["img"]["contrast_folder"]}/{CONFIG["img"]["number_template_file"]}'))
 
-# 確保有此資料夾
-folder_path = safe_filename(CONFIG["img"]["folder_path"])
-if not os.path.exists(folder_path):
-    os.makedirs(folder_path)
-    print(f"ERROR: 查無此資料夾 以自動建立資料夾 {CONFIG['img']['folder_path']}")
 
 # 主程式
 def main_function():
     global CONFIG
+    
+    # 確保有此資料夾
+    folder_path = safe_filename(CONFIG["img"]["folder_path"])
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+    error_message(f"查無此資料夾 以自動建立資料夾 {CONFIG['img']['folder_path']}", "warning")
     # 確保有答案
     have_ans = []
     # 記錄每題答錯人數
@@ -219,24 +239,27 @@ def main_function():
         if check_file_name == "ansfile?":
             ans_file_split = filename.split("/")
             if ans_file_split[-1] == "ansfile?.ansfile?":
-                filename = ans_file_split[0]
+                filename = "/".join(ans_file_split[:-1])
                 check_is_ans_file = True
             elif ans_file_split[-1] == "nofile?.ansfile?":
-                print(f"ERROR: 找不到指定的答案檔案")
+                error_message(f"找不到指定的答案檔案", "wraning")
                 continue
         elif not check_file_name in safe_text(CONFIG["img"]["format"]):
-            print(f"ERROR: {filename} 不是符合要求的圖片格式 以下是可接受的格式:\n{', '.join(CONFIG['img']['format'])}")
+            error_message(f"{filename} 不是符合要求的圖片格式 以下是可接受的格式:\n{', '.join(CONFIG['img']['format'])}", "wraning")
             continue
 
         # 讀取影像
-        image = read_image_file(f"{safe_filename(CONFIG['img']['folder_path'])}/{filename}")
+        if check_is_ans_file and CONFIG["img"]["interface"]:
+            image = read_image_file(f"{filename}")
+        else:
+            image = read_image_file(f"{safe_filename(CONFIG['img']['folder_path'])}/{filename}")
         if image is None:
-            print(f"ERROR: 讀取 {filename} 失敗")
+            error_message(f"讀取 {filename} 失敗", "wraning")
             continue
 
         # 影像預處理
         thresh = preprocess_image(image)
-        # 檢測用法大圖片
+        # 檢測用放大圖片
         thresh = cv2.dilate(preprocess_image(image), None, iterations=2)
         contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
         
@@ -252,7 +275,7 @@ def main_function():
                     max_area = area
                     contour_with_max_area = approx
         if contour_with_max_area is None:
-            print(f"Error: {filename} 找不到有效的矩形")
+            error_message(f"{filename} 找不到有效的矩形", "wraning")
             continue
         
         # 使用透視變換切割圖片
@@ -311,7 +334,7 @@ def main_function():
         number_template_preprocess = preprocess_image(number_template) # 座號定位模板
         template_preprocess = preprocess_image(template) # 答案定位模板
 
-        # 將原有答案卡部分清除 只保留劃記痕跡
+        # 將原有答案卷部分清除 只保留劃記痕跡
         # use_image_blank = cv2.subtract(use_image_preprocess, minus_blank_preprocess) 
         # 影像預處理(相對於常用的預處理不太一樣 )
         use_img_gray = use_image if len(use_image.shape) == 2 else cv2.cvtColor(use_image, cv2.COLOR_BGR2GRAY)
@@ -325,7 +348,7 @@ def main_function():
         vertical_mask = cv2.morphologyEx(use_img_thresh, cv2.MORPH_OPEN, vertical_kernel, iterations=1)
         # 合併水平線和垂直線
         table_mask = cv2.bitwise_or(horizontal_mask, vertical_mask)
-        # 將答案卡中線條清除
+        # 將答案卷中線條清除
         use_image_blank = cv2.cvtColor(use_image_preprocess, cv2.COLOR_GRAY2BGR)
         use_image_blank[np.where(table_mask==255)] = [0,0,0] 
         use_image_blank = use_image_preprocess
@@ -357,7 +380,7 @@ def main_function():
                 ans_selected_option = []
                 for option in range(CONFIG["find_table"]["number_of_answers"]):
                     # 計算寬度
-                    pos_x = position[0]-each_lattice_width/3.1 + (option+1)*each_lattice_width + option*each_lattice_width*0.06
+                    pos_x = position[0]-each_lattice_width/3.1 + (option+1)*each_lattice_width + option*each_lattice_width*0.065
                     
                     # 取得答案
                     get_ans_img = use_image_blank[int(pos_y-each_lattice_height/3):int(pos_y+each_lattice_height/3), int(pos_x):int(pos_x+each_lattice_width/1.5-(each_lattice_width/20 if option >= CONFIG["find_table"]["number_of_answers"]-1 else 0))]
@@ -390,7 +413,7 @@ def main_function():
             
             # 檢查用
             # ct += 1
-            # cv2.imwrite(f"out-{filename}.png", clone)
+            # cv2.imwrite(f"out.png", clone)
             ###
         
         # 讀取座號
@@ -445,7 +468,7 @@ def main_function():
             save_data = [CONFIG["img"]["ans_file_name"], all_ans_out, 100]
             # everyone_data[CONFIG["img"]["ans_file_name"]] = [0, all_ans_out, CONFIG["score_setting"]["number_of_questions"], 100]
             write_csv(f'{safe_filename(CONFIG["read_write_log"]["log_file_name"])}', filename, save_data)
-            print(f"已找到答案檔案 {filename} 並用於評分")
+            error_message(f"已找到答案檔案 {filename} 並用於評分")
             continue
 
         
@@ -488,7 +511,8 @@ def main_function():
         "Q:ABD,S:ACD,V:BCD,Z:ABCD"
     ]
     explanation_count = 2
-    with open(f'{safe_filename_export(CONFIG["img"]["folder_path"])}', "w", encoding="utf-8-sig") as csvfile:
+    output_file_name = f'{safe_filename_export(CONFIG["img"]["folder_path"])}'
+    with open(f'{output_file_name}', "w", encoding="utf-8-sig") as csvfile:
         # 寫入正確答案 如沒有填入空白
         if len(have_ans) <= 0:
             csvfile.write("\\     ,"+f'標準答案  ,{"  ,"*CONFIG["score_setting"]["number_of_questions"]}答對題數,得分  ')
@@ -537,9 +561,10 @@ def main_function():
         # 最低分
         csvfile.write(f'{" "*6},{" "*10},{"  ,"*CONFIG["score_setting"]["number_of_questions"]}最低分  ,{min(total_score):<6d}\n')
 
+    return output_file_name
 
 # 頁面用函數
-def run_script(pdf_file, number_of_questions, total_score):
+def run_script(pdf_file, number_of_questions, total_score, ans_file):
     global CONFIG
     # 檢查檔案
     if not pdf_file: raise gr.Error("請上傳檔案", title="錯誤")
@@ -553,35 +578,43 @@ def run_script(pdf_file, number_of_questions, total_score):
     #     for img in pdf_doc.get_page_images(dct):
     #         xref = img[0]
     #         pix = Pixmap(pdf_doc, xref)
-    #         pix.save(os.path.join(work_folder, f'img_{dct}.png'))
+    #         pix.save(os.path.join(work_folder, f'{dct}_{hashlib.md5(f"img_{dct+1}_datetime.now()".encode()).hexdigest()}.png'))
     pdf_doc = PdfReader(pdf_file.name)
-    for pdf_page in pdf_doc.pages:
-        for pdf_image in pdf_page.images:
-            with open(os.path.join(work_folder, pdf_image.name), "wb") as pdf_path:
+    for page_num, pdf_page in enumerate(pdf_doc.pages):  # 使用 enumerate 為頁面編號
+        for pdf_image in pdf_page.images:  # 使用圖片索引確保唯一性
+            # 使用頁碼和圖片名稱來生成唯一檔名
+            image_path = os.path.join(work_folder, f'{page_num}_{hashlib.md5(f"{pdf_image.name}_{page_num + 1}_{datetime.now()}".encode()).hexdigest()}')
+            with open(f"{image_path}.png", "wb") as pdf_path:
                 pdf_path.write(pdf_image.data)
-    # 
+    # 將資料寫入設定檔
+    CONFIG["img"]["folder_path"] = work_folder
+    CONFIG["score_setting"]["number_of_questions"] = number_of_questions
+    CONFIG["score_setting"]["total_score"] = total_score
+    CONFIG["img"]["ans_file_name"] = ans_file.name if ans_file else ""
+    output_file_name = main_function()
+    return output_file_name
 
-    return f"{pdf_file.name}"
 
-# 建立介面
-iface = gr.Interface(
-    fn=run_script,
-    inputs=[
-        gr.File(label="上傳檔案", file_types=[".pdf"]),
-        gr.Slider(minimum=1, maximum=50, label="題目數量", step=1),
-        gr.Slider(minimum=1, maximum=100, label="總分", step=5)
-    ],
-    outputs=[
-        "text"
-    ],
-    title="視覺化讀卡工具",
-    description="上傳掃描過後的答案卡來自動評分",
-    submit_btn = "一鍵執行"
-)
 
 # 執行程式
 if __name__ == "__main__":
     if CONFIG["img"]["interface"]:
+        # 建立介面
+        iface = gr.Interface(
+            fn=run_script,
+            inputs=[
+                gr.File(label="上傳檔案", file_types=[".pdf"]),
+                gr.Slider(minimum=1, maximum=50, label="輸入題目數量", step=1, value=50),
+                gr.Slider(minimum=1, maximum=100, label="輸入總分", value=100),
+                gr.File(label="上傳上傳答案檔")
+            ],
+            outputs=[
+                gr.File(label="下載檔案", type="filepath")
+            ],
+            title="智慧視覺閱卷系統",
+            description="上傳掃描過後的答案卷來自動評分",
+            submit_btn = "一鍵執行"
+        )
         iface.launch(inbrowser=True) # 自動於瀏覽器中開啟
     else:
         main_function()
