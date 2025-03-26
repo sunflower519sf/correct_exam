@@ -353,20 +353,20 @@ def main_function():
         use_image_blank[np.where(table_mask==255)] = [0,0,0] 
         use_image_blank = use_image_preprocess
 
-        # 檢查方向是否顛倒
-        # 答案座標
-        position_points = match_template(use_image_blank, template_preprocess, CONFIG)
-        np.random.shuffle(position_points)
-        # 號碼座標
-        position_points_number = match_template(use_image_blank, number_template_preprocess, CONFIG)
-        np.random.shuffle(position_points_number)
-        # 檢查圖片
-        if (position_points[0][2] < position_points_number[0][2]) and (position_points[-1][2] < position_points_number[-1][2]):
-            error_message(f"{filename} 答案卷方向錯誤, 以自動轉正", "info")
-            use_image_blank = cv2.rotate(use_image_blank, cv2.ROTATE_180)
-        elif (position_points[0][2] < position_points_number[0][2]):
-            error_message(f"{filename} 答案卷疑似有問題, 結果可能有誤, 以自動轉正", "warning")
-            use_image_blank = cv2.rotate(use_image_blank, cv2.ROTATE_180)
+        # # 檢查方向是否顛倒
+        # # 答案座標
+        # position_points = match_template(use_image_blank, template_preprocess, CONFIG)
+        # np.random.shuffle(position_points)
+        # # 號碼座標
+        # position_points_number = match_template(use_image_blank, number_template_preprocess, CONFIG)
+        # np.random.shuffle(position_points_number)
+        # # 檢查圖片
+        # if (position_points[0][2] < position_points_number[0][2]) and (position_points[-1][2] < position_points_number[-1][2]):
+        #     error_message(f"{filename} 答案卷方向錯誤, 以自動轉正", "info")
+        #     use_image_blank = cv2.rotate(use_image_blank, cv2.ROTATE_180)
+        # elif (position_points[0][2] < position_points_number[0][2]):
+        #     error_message(f"{filename} 答案卷疑似有問題, 結果可能有誤, 以自動轉正", "warning")
+        #     use_image_blank = cv2.rotate(use_image_blank, cv2.ROTATE_180)
 
         # 取得答案
         # 計算匹配值
