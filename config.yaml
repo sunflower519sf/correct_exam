@@ -10,7 +10,7 @@ img:
   pdf_to_img_folder: src/temp_img # 設定pdf轉圖片後的存放資料夾
   ans_template_file: ans_template.png  # 設定答案模板圖片路徑 預設為 template.png
   number_template_file: number_template.png  # 設定數字模板圖片路徑 預設為 number_template.png
-  interface: !!bool True  # 設定是否開啟介面 預設為true 關閉後不顯示介面
+  interface: !!bool False  # 設定是否開啟介面 預設為true 關閉後不顯示介面
 
 score_setting: 
   total_score: 100  # 設定總分 預設為100

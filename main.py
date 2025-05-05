@@ -355,16 +355,16 @@ def main_function():
 
         # # 檢查方向是否顛倒
         # # 答案座標
-        # position_points = match_template(use_image_blank, template_preprocess, CONFIG)
+        # position_points = match_template(use_image_preprocess, template_preprocess, CONFIG)
         # np.random.shuffle(position_points)
         # # 號碼座標
-        # position_points_number = match_template(use_image_blank, number_template_preprocess, CONFIG)
+        # position_points_number = match_template(use_image_preprocess, number_template_preprocess, CONFIG)
         # np.random.shuffle(position_points_number)
         # # 檢查圖片
-        # if (position_points[0][2] < position_points_number[0][2]) and (position_points[-1][2] < position_points_number[-1][2]):
+        # if (position_points[0][1] < position_points_number[0][1]) and (position_points[-1][1] < position_points_number[-1][1]):
         #     error_message(f"{filename} 答案卷方向錯誤, 以自動轉正", "info")
         #     use_image_blank = cv2.rotate(use_image_blank, cv2.ROTATE_180)
-        # elif (position_points[0][2] < position_points_number[0][2]):
+        # elif (position_points[0][1] < position_points_number[0][1]):
         #     error_message(f"{filename} 答案卷疑似有問題, 結果可能有誤, 以自動轉正", "warning")
         #     use_image_blank = cv2.rotate(use_image_blank, cv2.ROTATE_180)
 
@@ -378,7 +378,7 @@ def main_function():
         each_lattice_width = (CONFIG["find_table"]["crop_ratio_mult"]*11) / (1 if position_quantity < 1 else position_quantity) / (CONFIG["find_table"]["number_of_answers"]+1)
         # 檢查用
         # ct = 0
-        # clone = use_image.copy()
+        clone = use_image.copy()
         ###
         break_check = False
         for position in sorted(position_points):
@@ -397,13 +397,13 @@ def main_function():
                 for option in range(CONFIG["find_table"]["number_of_answers"]):
                     # 計算寬度
                     pos_x = position[0]-each_lattice_width/3.1 + (option+1)*each_lattice_width + option*each_lattice_width*0.065
-                    
+    
                     # 取得答案
-                    get_ans_img = use_image_blank[int(pos_y-each_lattice_height/3):int(pos_y+each_lattice_height/3), int(pos_x):int(pos_x+each_lattice_width/1.5-(each_lattice_width/20 if option >= CONFIG["find_table"]["number_of_answers"]-1 else 0))]
+                    get_ans_img = use_image_blank[int(pos_y-each_lattice_height/3+each_lattice_height/15):int(pos_y+each_lattice_height/3-each_lattice_height/15), int(pos_x):int(pos_x+each_lattice_width/1.5-(each_lattice_width/20 if option >= CONFIG["find_table"]["number_of_answers"]-1 else 0))]
                     
                     # 檢查用
-                    # cv2.rectangle(clone, (int(pos_x), int(pos_y-each_lattice_height/3)), (int(pos_x+each_lattice_width/1.5-(each_lattice_width/20 if option >= CONFIG["find_table"]["number_of_answers"]-1 else 0)), int(pos_y+each_lattice_height/3)), (0, 0, 255), 1)
-                    # cv2.imwrite(f"out.png", clone)
+                    cv2.rectangle(clone, (int(pos_x), int(pos_y-each_lattice_height/3+each_lattice_height/15)), (int(pos_x+each_lattice_width/1.5-(each_lattice_width/20 if option >= CONFIG["find_table"]["number_of_answers"]-1 else 0)), int(pos_y+each_lattice_height/3-each_lattice_height/15)), (0, 0, 255), 1)
+                    cv2.imwrite(f"out.png", clone)
                     ###
 
                     # 將圖片中內容放大
@@ -631,7 +631,7 @@ if __name__ == "__main__":
             description="上傳掃描過後的答案卷來自動評分",
             submit_btn = "一鍵執行"
         )
-        iface.launch(share=True, inbrowser=True) # 自動於瀏覽器中開啟
+        iface.launch(share=False, inbrowser=True) # 自動於瀏覽器中開啟
     else:
         main_function()
 
