@@ -1,4 +1,4 @@
-﻿# 智慧視覺閱卷系統-目前放入被審資料
+﻿# 智慧視覺閱卷系統
 
 
 [![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/sunflower519sf/correct_exam/total?style=plastic&logo=github)](https://github.com/sunflower519sf/correct_exam/releases/latest)
@@ -33,4 +33,5 @@ python main.py
 - `requirements.txt`：python套件需求檔，用於安裝所需的套件。
 - `config.yaml`：設定檔，用於設定閱卷系統的各項設定，包含圖片路徑、答案名稱、答案路徑、輸出檔名、可支援格式、分數等。注意無此檔案將導致程式無法執行。
 - `csvreadwrite.py`：用作於讀寫csv檔案，讀取csv不是使用外部套件，且格是因為資料含有逗號，會與正常格式衝突，所以使用不同分隔符號。
+
 
